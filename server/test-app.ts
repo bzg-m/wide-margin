@@ -1,5 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { Role, type Annotation, type Reading, type Reply, type User } from '../shared/api.ts';
+import {
+  EventName,
+  Role,
+  type Annotation,
+  type Reading,
+  type Reply,
+  type User,
+} from '../shared/api.ts';
 import { createApp } from './app.ts';
 import { openDatabase } from './db/database.ts';
 
@@ -74,4 +81,49 @@ export async function addPost(
       : `/v1/readings/${readingId}/annotations/${annotationId}/replies`;
   const res = await request(user, path, { method: 'POST', body: { text } });
   return res.json();
+}
+
+/** One event read from an event stream, with its JSON data parsed. */
+export type TestEvent = { name: string; data: Record<string, unknown> };
+
+/**
+ * Opens a reading's event stream as the user and waits for `ready`, the way the client will.
+ * Read events with `next()`; `close()` disconnects, as a browser closing the page would.
+ */
+export async function openEventStream(request: TestRequest, user: User, readingId: string) {
+  const res = await request(user, `/v1/readings/${readingId}/events`);
+  if (res.status !== 200 || !res.body) throw new Error(`Event stream failed: ${res.status}`);
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+
+  // SSE events are blocks of "field: value" lines separated by a blank line.
+  // Lines starting with ":" are comments, such as heartbeats, and are skipped.
+  async function next(): Promise<TestEvent> {
+    for (;;) {
+      const end = buffer.indexOf('\n\n');
+      if (end === -1) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error('Event stream ended');
+        buffer += value;
+        continue;
+      }
+      const lines = buffer
+        .slice(0, end)
+        .split('\n')
+        .filter((line) => !line.startsWith(':'));
+      buffer = buffer.slice(end + 2);
+      if (lines.length === 0) continue;
+      const field = (name: string) =>
+        lines
+          .find((line) => line.startsWith(`${name}:`))
+          ?.slice(name.length + 1)
+          .trim() ?? '';
+      const data = field('data');
+      return { name: field('event'), data: data ? JSON.parse(data) : {} };
+    }
+  }
+
+  const first = await next();
+  if (first.name !== EventName.Ready) throw new Error(`Expected ready, got ${first.name}`);
+  return { next, close: () => reader.cancel() };
 }

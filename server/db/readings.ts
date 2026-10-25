@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { Reading } from '../../shared/api.ts';
 import type { CreateReadingBody } from '../../shared/schemas.ts';
-import { KEY_REUSED } from './idempotency.ts';
+import { KEY_REUSED, type CreateResult } from './idempotency.ts';
 import { parseId } from './ids.ts';
 
 // The counting rules: every count on a reading comes from this query over the posts view.
@@ -70,7 +70,7 @@ export type NewReading = CreateReadingBody & {
  * Creates a reading, or returns the one created earlier with the same idempotency key.
  * Returns `KEY_REUSED` if that key was used for different content.
  */
-export function createReading(db: DatabaseSync, input: NewReading): Reading | typeof KEY_REUSED {
+export function createReading(db: DatabaseSync, input: NewReading): CreateResult<Reading> {
   const creatorId = Number(input.creatorId);
   // The same steps appear in createThread and createReply; see the note in posts.ts.
   // Node runs one request's code at a time, switching only at an `await`. These database
@@ -85,7 +85,7 @@ export function createReading(db: DatabaseSync, input: NewReading): Reading | ty
       { id: number; title: string; description: string } | undefined;
     if (earlier) {
       const same = earlier.title === input.title && earlier.description === input.description;
-      return same ? findReading(db, String(earlier.id))! : KEY_REUSED;
+      return same ? { resource: findReading(db, String(earlier.id))!, isNew: false } : KEY_REUSED;
     }
   }
   const { id } = db
@@ -100,5 +100,5 @@ export function createReading(db: DatabaseSync, input: NewReading): Reading | ty
       input.createdAt,
       input.idempotencyKey ?? null,
     ) as { id: number };
-  return findReading(db, String(id))!;
+  return { resource: findReading(db, String(id))!, isNew: true };
 }

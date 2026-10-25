@@ -58,3 +58,16 @@ export type ListAnnotationsResponse = { annotations: Annotation[]; nextPageToken
 
 /** One page of replies. */
 export type ListRepliesResponse = { replies: Reply[]; nextPageToken?: string };
+
+/** Names of the events sent on a reading's event stream. */
+export const EventName = {
+  /** Sent once the stream is listening; anything posted afterwards will arrive. */
+  Ready: 'ready',
+  AnnotationCreated: 'annotation.created',
+  ReplyCreated: 'reply.created',
+} as const;
+
+/** An event about a reading, as sent on its event stream. */
+export type ReadingEvent =
+  | { name: typeof EventName.AnnotationCreated; data: Annotation }
+  | { name: typeof EventName.ReplyCreated; data: Reply };

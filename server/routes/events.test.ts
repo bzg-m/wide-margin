@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest';
+import { EventName } from '../../shared/api.ts';
+import { addPost, addReading, createTestApp, openEventStream } from '../test-app.ts';
+
+describe('reading event stream', () => {
+  it('sends new threads to everyone watching the reading', async () => {
+    const { request, student, instructor } = createTestApp();
+    // An extra reading first, so this reading's ID differs from its first thread's
+    // and an event published under the wrong ID would be missed.
+    await addReading(request, instructor);
+    const reading = await addReading(request, instructor);
+    const stream = await openEventStream(request, student, reading.id);
+
+    await addPost(request, instructor, { readingId: reading.id, text: 'New thread' });
+
+    expect(await stream.next()).toMatchObject({
+      name: EventName.AnnotationCreated,
+      data: { text: 'New thread', readingId: reading.id },
+    });
+    await stream.close();
+  });
+
+  it('sends new replies to everyone watching the reading', async () => {
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const thread = await addPost(request, student, { readingId: reading.id });
+    const stream = await openEventStream(request, student, reading.id);
+
+    await addPost(request, instructor, {
+      readingId: reading.id,
+      annotationId: thread.id,
+      text: 'New reply',
+    });
+
+    expect(await stream.next()).toMatchObject({
+      name: EventName.ReplyCreated,
+      data: { text: 'New reply', annotationId: thread.id },
+    });
+    await stream.close();
+  });
+
+  it("doesn't send posts from other readings", async () => {
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const otherReading = await addReading(request, instructor);
+    const stream = await openEventStream(request, student, reading.id);
+
+    await addPost(request, instructor, { readingId: otherReading.id, text: 'Elsewhere' });
+    await addPost(request, instructor, { readingId: reading.id, text: 'Here' });
+
+    // If the other reading's post had leaked through, it would arrive first.
+    expect((await stream.next()).data.text).toBe('Here');
+    await stream.close();
+  });
+
+  it("answers 404 for a reading that doesn't exist", async () => {
+    const { request, student } = createTestApp();
+
+    const res = await request(student, '/v1/readings/999/events');
+
+    expect(res.status).toBe(404);
+  });
+
+  it.each(['thread', 'reply'])('sends a retried %s only once', async (kind) => {
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const thread = await addPost(request, student, { readingId: reading.id });
+    const path =
+      kind === 'thread'
+        ? `/v1/readings/${reading.id}/annotations`
+        : `/v1/readings/${reading.id}/annotations/${thread.id}/replies`;
+    const post = (text: string, headers: Record<string, string> = {}) =>
+      request(student, path, { method: 'POST', body: { text }, headers });
+    const stream = await openEventStream(request, student, reading.id);
+
+    await post('Original', { 'Idempotency-Key': 'key-1' });
+    await post('Original', { 'Idempotency-Key': 'key-1' });
+    await post('Next');
+
+    // A repeated event for the retry would arrive between these two.
+    expect((await stream.next()).data.text).toBe('Original');
+    expect((await stream.next()).data.text).toBe('Next');
+    await stream.close();
+  });
+});

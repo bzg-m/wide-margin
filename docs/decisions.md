@@ -53,12 +53,17 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 ## Real-time updates
 
+How it works end to end is in [realtime.md](realtime.md).
+
 - **Live updates use Server-Sent Events (SSE).** SSE is built into the browser, reconnects on its own, and sends data from server to client, which is all that is needed because writes go through the API. Polling adds delay, and WebSockets add two-way machinery the app doesn't use.
 - **There is one stream per reading,** at `GET /v1/readings/{id}/events`. It carries every new thread and reply for that reading, whether or not a thread is open, so the thread list and reply counts stay current.
-- **The client opens the stream before loading, and merges everything by ID.** Nothing posted during loading is missed. Duplicates, such as your own post arriving in both the create response and the stream, collapse into one. Fetched data is merged into what the client has, never swapped in, because an event can arrive before a fetch that started earlier.
+- **The stream starts with a `ready` event, sent once the server is listening.** The client loads the reading only after `ready`, so nothing posted during loading is missed. The browser's own `open` event can't promise that.
+- **The client merges everything by ID.** Duplicates, such as your own post arriving in both the create response and the stream, collapse into one. Fetched data is merged into what the client has, never swapped in, because an event can arrive before a fetch that started earlier.
 - **After a reconnect, the client reloads** the thread list and any open thread's replies. That is simpler than replaying missed events, which would need an event log.
+- **Only new posts are published.** A retried create with the same `Idempotency-Key` publishes nothing.
+- **A heartbeat comment every 25 seconds** keeps proxies from closing a quiet stream.
 - **Concurrent posts never conflict.** Replies are all accepted and ordered by server time. If editing is added, ETags would prevent one edit from silently overwriting another.
-- **Known limits at scale:** several server instances would need a shared message channel; proxies need a periodic heartbeat to keep connections open; HTTP/1.1 allows a browser about 6 connections per site, which HTTP/2 lifts.
+- **Known limits at scale:** several server instances would need a shared message channel; some proxies buffer responses and must be told not to; HTTP/1.1 allows a browser about 6 connections per site, which HTTP/2 lifts.
 
 ## Reliability and caching
 

@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
+import { ReadingEvents } from './events.ts';
 import { problemResponse } from './problem.ts';
 import { annotationRoutes } from './routes/annotations.ts';
 import { readingRoutes } from './routes/readings.ts';
@@ -16,8 +17,9 @@ export function createApp(db: DatabaseSync): Hono {
   app.use(csrf());
   app.route('/v1/session', sessionRoutes(db));
   app.route('/v1/users', userRoutes(db));
-  app.route('/v1/readings', readingRoutes(db));
-  app.route('/v1/readings/:readingId/annotations', annotationRoutes(db));
+  const events = new ReadingEvents();
+  app.route('/v1/readings', readingRoutes(db, events));
+  app.route('/v1/readings/:readingId/annotations', annotationRoutes(db, events));
 
   app.notFound((c) =>
     problemResponse(c, 404, 'Not found', `No route for ${c.req.method} ${c.req.path}.`),

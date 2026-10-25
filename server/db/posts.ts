@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { Annotation, Reply, Role } from '../../shared/api.ts';
 import type { CreatePostBody } from '../../shared/schemas.ts';
-import { KEY_REUSED } from './idempotency.ts';
+import { KEY_REUSED, type CreateResult } from './idempotency.ts';
 import { parseId } from './ids.ts';
 
 const SELECT_THREADS = `
@@ -125,7 +125,7 @@ export function createThread(
   db: DatabaseSync,
   readingId: string,
   input: NewPost,
-): Annotation | typeof KEY_REUSED {
+): CreateResult<Annotation> {
   const authorId = Number(input.authorId);
   // As in createReading, no other request can run between this lookup and the insert.
   if (input.idempotencyKey !== undefined) {
@@ -137,7 +137,7 @@ export function createThread(
       { id: number; reading_id: number; text: string } | undefined;
     if (earlier) {
       const same = earlier.reading_id === Number(readingId) && earlier.text === input.text;
-      return same ? findThread(db, String(earlier.id))! : KEY_REUSED;
+      return same ? { resource: findThread(db, String(earlier.id))!, isNew: false } : KEY_REUSED;
     }
   }
   const { id } = db
@@ -152,7 +152,7 @@ export function createThread(
       input.createdAt,
       input.idempotencyKey ?? null,
     ) as { id: number };
-  return findThread(db, String(id))!;
+  return { resource: findThread(db, String(id))!, isNew: true };
 }
 
 /**
@@ -163,7 +163,7 @@ export function createReply(
   db: DatabaseSync,
   annotationId: string,
   input: NewPost,
-): Reply | typeof KEY_REUSED {
+): CreateResult<Reply> {
   const authorId = Number(input.authorId);
   // As in createReading, no other request can run between this lookup and the insert.
   if (input.idempotencyKey !== undefined) {
@@ -175,7 +175,7 @@ export function createReply(
       { id: number; annotation_id: number; text: string } | undefined;
     if (earlier) {
       const same = earlier.annotation_id === Number(annotationId) && earlier.text === input.text;
-      return same ? findReply(db, earlier.id)! : KEY_REUSED;
+      return same ? { resource: findReply(db, earlier.id)!, isNew: false } : KEY_REUSED;
     }
   }
   const { id } = db
@@ -190,5 +190,5 @@ export function createReply(
       input.createdAt,
       input.idempotencyKey ?? null,
     ) as { id: number };
-  return findReply(db, id)!;
+  return { resource: findReply(db, id)!, isNew: true };
 }

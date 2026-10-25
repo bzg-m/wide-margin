@@ -2,11 +2,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
-import type {
-  Annotation,
-  ListAnnotationsResponse,
-  ListRepliesResponse,
-  User,
+import {
+  EventName,
+  type Annotation,
+  type ListAnnotationsResponse,
+  type ListRepliesResponse,
+  type User,
 } from '../../shared/api.ts';
 import { createPostBody, type CreatePostBody } from '../../shared/schemas.ts';
 import { requireUser, type AppEnv } from '../auth.ts';
@@ -20,6 +21,7 @@ import {
   type NewPost,
 } from '../db/posts.ts';
 import { findReading } from '../db/readings.ts';
+import type { ReadingEvents } from '../events.ts';
 import { paginate } from '../pagination.ts';
 import { jsonBody } from '../validation.ts';
 
@@ -29,8 +31,8 @@ type AnnotationEnv = AppEnv & { Variables: { annotation: Annotation } };
 // readingId. TypeScript can't see the mount path from here, so the `!` tells it the value exists.
 const readingIdOf = (c: Context) => c.req.param('readingId')!;
 
-/** Routes under /v1/readings/:readingId/annotations: threads and their replies. */
-export function annotationRoutes(db: DatabaseSync): Hono<AppEnv> {
+/** Routes under /v1/readings/:readingId/annotations: threads and their replies. New posts are published to `events`. */
+export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
   routes.use(requireUser(db));
 
@@ -66,8 +68,12 @@ export function annotationRoutes(db: DatabaseSync): Hono<AppEnv> {
     const post = newPost(body, c.get('user'), c.req.header('Idempotency-Key'));
     const result = createThread(db, readingIdOf(c), post);
     if (result === KEY_REUSED) throw keyReused();
-    c.header('Location', `/v1/readings/${result.readingId}/annotations/${result.id}`);
-    return c.json(result, 201);
+    const { resource: annotation, isNew } = result;
+    if (isNew) {
+      events.publish(annotation.readingId, { name: EventName.AnnotationCreated, data: annotation });
+    }
+    c.header('Location', `/v1/readings/${annotation.readingId}/annotations/${annotation.id}`);
+    return c.json(annotation, 201);
   });
 
   routes.get('/:annotationId/replies', requireAnnotation, (c) => {
@@ -83,7 +89,9 @@ export function annotationRoutes(db: DatabaseSync): Hono<AppEnv> {
     const post = newPost(body, c.get('user'), c.req.header('Idempotency-Key'));
     const result = createReply(db, c.get('annotation').id, post);
     if (result === KEY_REUSED) throw keyReused();
-    return c.json(result, 201);
+    const { resource: reply, isNew } = result;
+    if (isNew) events.publish(reply.readingId, { name: EventName.ReplyCreated, data: reply });
+    return c.json(reply, 201);
   });
 
   return routes;
