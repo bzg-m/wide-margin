@@ -58,6 +58,26 @@ describe('annotations and replies', () => {
     expect(replies.map((r: Reply) => r.text)).toEqual(['First', 'Second', 'Third']);
   });
 
+  it('lists every reply on a reading oldest first, and none from other readings', async () => {
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const otherReading = await addReading(request, instructor);
+    const first = await addPost(request, student, { readingId: reading.id });
+    const elsewhere = await addPost(request, student, { readingId: otherReading.id });
+    const second = await addPost(request, student, { readingId: reading.id });
+    const reply = (annotationId: string, readingId: string, text: string) =>
+      addPost(request, instructor, { readingId, annotationId, text });
+    await reply(second.id, reading.id, 'On second');
+    await reply(elsewhere.id, otherReading.id, 'On the other reading');
+    await reply(first.id, reading.id, 'On first');
+
+    const res = await request(student, `/v1/readings/${reading.id}/annotations/-/replies`);
+    const { replies } = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(replies.map((r: Reply) => r.text)).toEqual(['On second', 'On first']);
+  });
+
   it("shows each annotation's reply count and latest activity", async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);

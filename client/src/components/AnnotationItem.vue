@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Annotation } from '../../../shared/api.ts';
 import type { CreatePostBody } from '../../../shared/schemas.ts';
 import { isServerUnreachable, isShownInStatusArea } from '../api/client.ts';
@@ -14,7 +14,7 @@ const props = defineProps<{ annotation: Annotation }>();
 
 const discussion = useDiscussion();
 const now = useNow();
-const open = ref(false);
+const open = computed(() => discussion.isOpen(props.annotation.id));
 const loading = ref(false);
 const loadError = ref('');
 
@@ -43,10 +43,14 @@ async function loadReplies() {
   }
 }
 
-function toggle() {
-  open.value = !open.value;
-  if (open.value && !replies.value) void loadReplies();
-}
+// Replies load when the annotation opens, whether opened here or by "Show all replies".
+watch(
+  open,
+  (isOpen) => {
+    if (isOpen && !replies.value && !loading.value) void loadReplies();
+  },
+  { immediate: true },
+);
 
 const sendReply = (body: CreatePostBody, key: string) =>
   discussion.postReply(props.annotation.id, body, key);
@@ -65,7 +69,7 @@ const sendReply = (body: CreatePostBody, key: string) =>
       class="toggle"
       :aria-expanded="open"
       :aria-controls="repliesId"
-      @click="toggle"
+      @click="discussion.toggle(annotation.id)"
     >
       {{ toggleLabel }}
     </button>

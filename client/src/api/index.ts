@@ -97,6 +97,13 @@ export const listReplies = (readingId: string, annotationId: string) =>
     'replies' satisfies keyof ListRepliesResponse,
   );
 
+/** Every reply on a reading, from all of its annotations, oldest first. */
+export const listReadingReplies = (readingId: string) =>
+  api.listAll<Reply>(
+    `${annotationsPath(readingId)}/-/replies`,
+    'replies' satisfies keyof ListRepliesResponse,
+  );
+
 /** Posts an annotation. The same idempotency key must be used for every attempt at one post. */
 export const createAnnotation = (readingId: string, body: CreatePostBody, idempotencyKey: string) =>
   api.request<Annotation>(annotationsPath(readingId), { method: 'POST', body, idempotencyKey });

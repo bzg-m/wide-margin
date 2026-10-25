@@ -4,6 +4,11 @@ import { Role, type User } from './api.ts';
 export const Action = {
   CreateReading: 'createReading',
   ViewParticipation: 'viewParticipation',
+  /**
+   * Show every reply on a reading at once. This shapes the interface rather than restricting
+   * data: anyone can read every reply, so the server doesn't check it.
+   */
+  ReviewDiscussion: 'reviewDiscussion',
 } as const;
 /** One of the values of `Action`. */
 export type Action = (typeof Action)[keyof typeof Action];
@@ -13,6 +18,7 @@ export function can(user: User, action: Action): boolean {
   switch (action) {
     case Action.CreateReading:
     case Action.ViewParticipation:
+    case Action.ReviewDiscussion:
       return user.role === Role.Instructor;
     default: {
       // A compile error here means an action was added without a rule.

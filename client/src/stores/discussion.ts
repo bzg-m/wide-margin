@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import type { Annotation, Reading, Reply } from '../../../shared/api.ts';
 import type { CreatePostBody } from '../../../shared/schemas.ts';
 import {
@@ -7,6 +7,7 @@ import {
   createReply,
   getReading,
   listAnnotations,
+  listReadingReplies,
   listReplies,
 } from '../api/index.ts';
 import { applyAnnotation, applyReply, mergeReplies, type DiscussionState } from '../discussion.ts';
@@ -31,6 +32,12 @@ export const useDiscussion = defineStore('discussion', () => {
   const reading = ref<Reading | null>(null);
   const annotations = ref<Annotation[]>([]);
   const replies = ref<Record<string, Reply[]>>({});
+  /** IDs of the annotations whose replies are shown. */
+  const open = ref(new Set<string>());
+  /** Whether every annotation that has replies is showing them. */
+  const allRepliesShown = computed(() =>
+    annotations.value.every((a) => a.replyCount === 0 || open.value.has(a.id)),
+  );
   /** Whether the event stream is connected. */
   const live = ref(false);
   /** Other people's annotations that arrived while the top of the list was out of view. */
@@ -67,6 +74,7 @@ export const useDiscussion = defineStore('discussion', () => {
     reading.value = null;
     annotations.value = [];
     replies.value = {};
+    open.value = new Set();
     counted = new Set();
     live.value = false;
     unseenNewAnnotations.value = 0;
@@ -81,6 +89,50 @@ export const useDiscussion = defineStore('discussion', () => {
       ...replies.value,
       [annotationId]: mergeReplies(replies.value[annotationId] ?? [], loaded),
     };
+  }
+
+  /** Whether an annotation's replies are shown. */
+  function isOpen(annotationId: string): boolean {
+    return open.value.has(annotationId);
+  }
+
+  /** Shows an annotation's replies, or hides them if they're shown. */
+  function toggle(annotationId: string): void {
+    const next = new Set(open.value);
+    if (!next.delete(annotationId)) next.add(annotationId);
+    open.value = next;
+  }
+
+  /**
+   * Shows the replies of every annotation that has any, loaded with one request. Annotations
+   * without replies stay closed, since opening them would only add empty reply boxes.
+   * Load errors are thrown.
+   */
+  async function showAllReplies(): Promise<void> {
+    const id = readingId.value!;
+    await loadAllReplies(id, () => true);
+    if (readingId.value !== id) return;
+    const withReplies = annotations.value.filter((a) => a.replyCount > 0).map((a) => a.id);
+    open.value = new Set([...open.value, ...withReplies]);
+  }
+
+  /** Hides every annotation's replies. */
+  function hideAllReplies(): void {
+    open.value = new Set();
+  }
+
+  // Loads every reply on the reading with one request, and merges them into the replies shown
+  // for each annotation that `include` accepts.
+  async function loadAllReplies(id: string, include: (annotationId: string) => boolean) {
+    const loaded = await listReadingReplies(id);
+    if (readingId.value !== id) return;
+    const byAnnotation = Map.groupBy(loaded, (reply) => reply.annotationId);
+    const next = { ...replies.value };
+    for (const [annotationId, incoming] of byAnnotation) {
+      if (include(annotationId))
+        next[annotationId] = mergeReplies(next[annotationId] ?? [], incoming);
+    }
+    replies.value = next;
   }
 
   /** Posts an annotation, shows it at once, and schedules a re-read of the counts. */
@@ -115,8 +167,9 @@ export const useDiscussion = defineStore('discussion', () => {
         live.value = true;
         status.resolve(LIVE_PROBLEM);
         void reread();
-        for (const annotationId of Object.keys(replies.value)) {
-          loadReplies(annotationId).catch(() => {});
+        // One request refreshes every annotation whose replies are loaded.
+        if (Object.keys(replies.value).length > 0) {
+          loadAllReplies(id, (annotationId) => annotationId in replies.value).catch(() => {});
         }
       },
       onAnnotation: (annotation) => {
@@ -236,9 +289,14 @@ export const useDiscussion = defineStore('discussion', () => {
     replies,
     live,
     unseenNewAnnotations,
+    allRepliesShown,
     show,
     leave,
     loadReplies,
+    isOpen,
+    toggle,
+    showAllReplies,
+    hideAllReplies,
     postAnnotation,
     postReply,
     setTopInView,

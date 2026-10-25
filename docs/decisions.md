@@ -25,7 +25,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **A lost connection is shown only in the status area,** whichever request discovers it, and it clears as soon as any request gets an answer. Pages and actions don't repeat it, so there's one message and one Retry button. The API client reports the connection after every request, which keeps the rule in one place.
 - **The app never leaves a page on its own.** When a request finds the sign-in has ended (a 401, for example after signing out in another tab), the status area says so and offers Sign in. The page, and anything typed on it, stays until the user chooses. A refused permission (a 403) is an ordinary error for the action that caused it.
 - **Light and dark themes.** The app follows the system setting and offers a manual switch. Every color is a CSS custom property, so a theme is one set of values.
-- **"Expand all" is deferred.** With replies loading per annotation, expanding every annotation would mean one request per annotation. An endpoint returning all of a reading's replies would make it cheap, and instructor review is the case that would justify it.
+- **Instructors can show all replies at once.** Reviewing a reading's discussion is an instructor's main task, so one click opens every annotation that has replies, loaded with one request. Annotations without replies stay closed, since opening them would only add empty reply boxes. Students don't see the button, which keeps their view simpler; it is a rule in `can()`, so giving it to everyone is a one-line change. The server doesn't check it, because every reply is readable anyway.
 - **Reading titles use a serif font.** The material reads differently from the discussion around it.
 
 ## Counting
@@ -44,7 +44,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 ## API
 
 - **The API is resource-oriented HTTP and JSON.** It follows Google's API Improvement Proposals (AIP) where they don't depend on gRPC, and common HTTP standards elsewhere.
-- **Resources:** `users`, `readings`, `readings/{id}/annotations` and `readings/{id}/annotations/{id}/replies`, under `/v1`. Replies sit under their annotation because each belongs to exactly one.
+- **Resources:** `users`, `readings`, `readings/{id}/annotations` and `readings/{id}/annotations/{id}/replies`, under `/v1`. Replies sit under their annotation because each belongs to exactly one. `readings/{id}/annotations/-/replies` lists the replies of every annotation on a reading, using AIP-159's `-` for "any annotation".
 - **Methods are List and Get, plus Create for readings, annotations and replies.** Update and Delete can be added later without breaking clients.
 - **Replies load when an annotation is opened.** The annotation list includes each annotation's `replyCount` and `lastActivityAt`, which keeps the first load small.
 - **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call. The participation count is left out of responses for users who may not view it, so the server enforces the rule rather than the UI hiding it.
@@ -62,7 +62,7 @@ How it works end to end is in [realtime.md](realtime.md).
 - **The stream starts with a `ready` event, sent once the server is listening.** Every `ready`, first or after a reconnect, makes the client re-read the reading and its annotations, so nothing posted before it was listening is missed. The browser's own `open` event can't promise that, because it fires before the server has subscribed.
 - **Each post is counted once, by ID.** A post can arrive twice, for example your own post in its create response and again from the stream; the second copy changes nothing.
 - **Counts update at once, then the server's replace them.** A new post raises its annotation's and reading's counts locally, and a re-read from the server about 300 ms later replaces them. A re-read is applied only if nothing changed after it started, and only if no later re-read has been applied, so an older response can't undo a newer post. If it fails, the local counts stay.
-- **Re-reading replaces replaying missed events,** which would need a stored event log. Open annotations' replies are reloaded at the same time.
+- **Re-reading replaces replaying missed events,** which would need a stored event log. Loaded replies are reloaded at the same time, with one request for the whole reading.
 - **Only new posts are published.** A retried create with the same `Idempotency-Key` publishes nothing.
 - **A heartbeat event every 15 seconds** keeps proxies from closing a quiet stream, and lets the client notice a dead one. The browser can't always tell that a connection has died, so after 30 seconds without any event the client replaces the stream. The heartbeat is a named event because `EventSource` never passes comments to the page.
 - **Concurrent posts never conflict.** Replies are all accepted and ordered by server time. If editing is added, ETags would prevent one edit from silently overwriting another.

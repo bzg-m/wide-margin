@@ -13,11 +13,12 @@ import { createPostBody, type CreatePostBody } from '../../shared/schemas.ts';
 import { requireUser, type AppEnv } from '../auth.ts';
 import { KEY_REUSED } from '../db/idempotency.ts';
 import {
-  createReply,
   createAnnotation,
+  createReply,
   findAnnotation,
-  listReplies,
   listAnnotations,
+  listReadingReplies,
+  listReplies,
   type NewPost,
 } from '../db/posts.ts';
 import { findReading } from '../db/readings.ts';
@@ -74,6 +75,16 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
     }
     c.header('Location', `/v1/readings/${annotation.readingId}/annotations/${annotation.id}`);
     return c.json(annotation, 201);
+  });
+
+  // Replies from every annotation on the reading; "-" stands for "any annotation". Registered
+  // before the next route, which would otherwise take "-" for an annotation ID.
+  routes.get('/-/replies', (c) => {
+    const readingId = readingIdOf(c);
+    const { items, nextPageToken } = paginate(c, (offset, limit) =>
+      listReadingReplies(db, readingId, offset, limit),
+    );
+    return c.json({ replies: items, nextPageToken } satisfies ListRepliesResponse);
   });
 
   routes.get('/:annotationId/replies', requireAnnotation, (c) => {

@@ -100,6 +100,21 @@ export function listReplies(
   return rows.map(toReply);
 }
 
+/** Lists every reply on a reading, oldest first, one page at a time. */
+export function listReadingReplies(
+  db: DatabaseSync,
+  readingId: string,
+  offset: number,
+  limit: number,
+): Reply[] {
+  const rows = db
+    .prepare(
+      `${SELECT_REPLIES} WHERE a.reading_id = ? ORDER BY r.created_at, r.id LIMIT ? OFFSET ?`,
+    )
+    .all(Number(readingId), limit, offset) as ReplyRow[];
+  return rows.map(toReply);
+}
+
 function findReply(db: DatabaseSync, id: number): Reply | undefined {
   const row = db.prepare(`${SELECT_REPLIES} WHERE r.id = ?`).get(id);
   return row ? toReply(row as ReplyRow) : undefined;

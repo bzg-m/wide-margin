@@ -10,6 +10,7 @@ vi.mock('../api/index.ts', () => ({
   getReading: vi.fn(),
   listAnnotations: vi.fn(),
   listReplies: vi.fn(),
+  listReadingReplies: vi.fn(),
   createAnnotation: vi.fn(),
   createReply: vi.fn(),
 }));
@@ -132,16 +133,19 @@ describe('discussion store', () => {
   });
 
   describe('live updates', () => {
-    it("re-reads, and reloads open annotations' replies, on every ready", async () => {
+    it('re-reads, and reloads loaded replies with one request, on every ready', async () => {
       const discussion = useDiscussion();
       await discussion.loadReplies('10');
       vi.clearAllMocks();
+      vi.mocked(api.listReadingReplies).mockResolvedValue([reply('5')]);
 
       live.onReady();
       await vi.advanceTimersByTimeAsync(0);
 
       expect(api.listAnnotations).toHaveBeenCalledTimes(1);
-      expect(api.listReplies).toHaveBeenCalledWith('1', '10');
+      expect(api.listReadingReplies).toHaveBeenCalledTimes(1);
+      expect(api.listReplies).not.toHaveBeenCalled();
+      expect(discussion.replies['10'].map((r) => r.id)).toEqual(['5']);
     });
 
     it('re-reads when a post arrives before the reading has loaded', async () => {
@@ -180,6 +184,42 @@ describe('discussion store', () => {
 
       expect(whileScrolled).toBe(1);
       expect(discussion.unseenNewAnnotations).toBe(0);
+    });
+  });
+
+  describe('showing all replies', () => {
+    beforeEach(async () => {
+      vi.mocked(api.listAnnotations).mockResolvedValue([
+        { ...annotation(1), id: '10' },
+        { ...annotation(0), id: '11' },
+      ]);
+      vi.mocked(api.listReadingReplies).mockResolvedValue([reply('5')]);
+      await useDiscussion().show('1');
+    });
+
+    it('opens every annotation that has replies, loaded with one request', async () => {
+      const discussion = useDiscussion();
+
+      await discussion.showAllReplies();
+
+      expect(api.listReadingReplies).toHaveBeenCalledTimes(1);
+      expect(api.listReplies).not.toHaveBeenCalled();
+      expect(discussion.isOpen('10')).toBe(true);
+      expect(discussion.isOpen('11')).toBe(false);
+      expect(discussion.replies['10'].map((r) => r.id)).toEqual(['5']);
+      expect(discussion.allRepliesShown).toBe(true);
+    });
+
+    it('closes every annotation when hiding all replies', async () => {
+      const discussion = useDiscussion();
+      await discussion.showAllReplies();
+      discussion.toggle('11');
+
+      discussion.hideAllReplies();
+
+      expect(discussion.isOpen('10')).toBe(false);
+      expect(discussion.isOpen('11')).toBe(false);
+      expect(discussion.allRepliesShown).toBe(false);
     });
   });
 });

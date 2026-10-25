@@ -22,6 +22,7 @@ const canSeeParticipation = computed(
   () => !!session.user && can(session.user, Action.ViewParticipation),
 );
 const studentCount = ref<number | null>(null);
+const canReview = computed(() => !!session.user && can(session.user, Action.ReviewDiscussion));
 
 const order = ref<AnnotationOrder>(AnnotationOrder.Newest);
 const sortedAnnotations = computed(() => sortAnnotations(discussion.annotations, order.value));
@@ -94,6 +95,28 @@ onUnmounted(() => {
   discussion.leave();
 });
 
+const loadingAllReplies = ref(false);
+const allRepliesError = ref('');
+
+// A lost connection is already shown in the status area, so it isn't repeated here.
+async function toggleAllReplies() {
+  if (discussion.allRepliesShown) {
+    discussion.hideAllReplies();
+    return;
+  }
+  loadingAllReplies.value = true;
+  allRepliesError.value = '';
+  try {
+    await discussion.showAllReplies();
+  } catch (error) {
+    if (!isServerUnreachable(error) && !isShownInStatusArea(error)) {
+      allRepliesError.value = error instanceof Error ? error.message : 'Replies failed to load.';
+    }
+  } finally {
+    loadingAllReplies.value = false;
+  }
+}
+
 const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnnotation(body, key);
 </script>
 
@@ -135,6 +158,22 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
                 Recent activity
               </button>
             </div>
+            <button
+              v-if="canReview && discussion.reading.replyCount > 0"
+              type="button"
+              class="all-replies"
+              :disabled="loadingAllReplies"
+              @click="toggleAllReplies"
+            >
+              {{
+                loadingAllReplies
+                  ? 'Loading replies…'
+                  : discussion.allRepliesShown
+                    ? 'Hide all replies'
+                    : 'Show all replies'
+              }}
+            </button>
+            <span v-if="allRepliesError" class="error">{{ allRepliesError }}</span>
           </template>
           <!-- A quiet reassurance; problems with live updates appear in the status area. -->
           <span v-if="discussion.live" class="live muted">Live updates on</span>
@@ -201,6 +240,7 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   margin: var(--space-4) 0 var(--space-2);
@@ -225,6 +265,13 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
 .order button[aria-pressed='true'] {
   background: var(--color-instructor);
   color: var(--color-instructor-text);
+}
+
+.all-replies {
+  min-height: 44px;
+  border: none;
+  background: none;
+  color: var(--color-accent);
 }
 
 .empty {

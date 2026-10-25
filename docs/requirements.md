@@ -39,7 +39,7 @@ Each requirement is tagged:
 - **R11** (Core): Students and instructors can post an annotation. The text box is multi-line, with a Post button and a Ctrl+Enter (or Cmd+Enter) shortcut.
 - **R12** (Chosen): Students and instructors can reply to an annotation. Replies are one level deep.
 - **R13** (Core): Annotations are listed newest first by when they were posted. A new reply does not move its annotation. Annotations can also be sorted by last activity.
-- **R14** (Chosen): Each annotation shows its reply count. Opening it shows its replies, oldest first.
+- **R14** (Chosen): Each annotation shows its reply count. Opening it shows its replies, oldest first. Instructors can show every reply on the reading at once.
 - **R15** (Core): Each annotation and reply shows its author and when it was posted, as a relative time with the exact time on hover.
 - **R16** (Chosen): Instructor posts are marked visually.
 - **R17** (Core): New annotations and replies appear without a page refresh, for the author and for everyone else viewing the reading. This includes new annotations arriving while replies are open. The view shows whether live updates are connected.
