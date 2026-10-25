@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Role } from '../../../shared/api.ts';
 import { exactTime, relativeTime } from '../format.ts';
+import { useNow } from '../now.ts';
 
 /** One post's author line and text, for an annotation or a reply. Instructor posts are marked. */
 defineProps<{
@@ -9,6 +10,8 @@ defineProps<{
   createdAt: string;
   text: string;
 }>();
+
+const now = useNow();
 </script>
 
 <template>
@@ -17,7 +20,7 @@ defineProps<{
       <span class="author">{{ authorDisplayName }}</span>
       <span v-if="authorRole === Role.Instructor" class="badge">Instructor</span>
       <time class="muted" :datetime="createdAt" :title="exactTime(createdAt)">
-        {{ relativeTime(createdAt) }}
+        {{ relativeTime(createdAt, now) }}
       </time>
     </div>
     <p class="text">{{ text }}</p>

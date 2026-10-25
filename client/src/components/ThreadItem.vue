@@ -4,6 +4,7 @@ import type { Annotation } from '../../../shared/api.ts';
 import type { CreatePostBody } from '../../../shared/schemas.ts';
 import { isServerUnreachable, isShownInStatusArea } from '../api/client.ts';
 import { relativeTime } from '../format.ts';
+import { useNow } from '../now.ts';
 import { useDiscussion } from '../stores/discussion.ts';
 import PostComposer from './PostComposer.vue';
 import PostContent from './PostContent.vue';
@@ -12,6 +13,7 @@ import PostContent from './PostContent.vue';
 const props = defineProps<{ thread: Annotation }>();
 
 const discussion = useDiscussion();
+const now = useNow();
 const open = ref(false);
 const loading = ref(false);
 const loadError = ref('');
@@ -21,7 +23,7 @@ const repliesId = computed(() => `replies-${props.thread.id}`);
 const toggleLabel = computed(() => {
   const count = props.thread.replyCount;
   if (count === 0) return 'Reply';
-  const last = relativeTime(props.thread.lastActivityAt);
+  const last = relativeTime(props.thread.lastActivityAt, now.value);
   return `${count} ${count === 1 ? 'reply' : 'replies'} · last ${last}`;
 });
 

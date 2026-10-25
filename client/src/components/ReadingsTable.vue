@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import type { Reading } from '../../../shared/api.ts';
 import { exactTime, relativeTime } from '../format.ts';
+import { useNow } from '../now.ts';
 import { RouteName } from '../navigation.ts';
 import { annotationCount, SortKey, type Sort } from '../readings.ts';
 
@@ -16,6 +17,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ sort: [key: SortKey] }>();
+const now = useNow();
 
 const columns = computed(() => [
   { key: SortKey.Title, label: 'Title' },
@@ -75,7 +77,7 @@ function participation(reading: Reading) {
         <td v-if="showParticipation" data-label="Students">{{ participation(reading) }}</td>
         <td data-label="Created">
           <time :datetime="reading.createdAt" :title="exactTime(reading.createdAt)">
-            {{ relativeTime(reading.createdAt) }}
+            {{ relativeTime(reading.createdAt, now) }}
           </time>
         </td>
         <td data-label="Last activity">
@@ -84,7 +86,7 @@ function participation(reading: Reading) {
             :datetime="reading.lastActivityAt"
             :title="exactTime(reading.lastActivityAt)"
           >
-            {{ relativeTime(reading.lastActivityAt) }}
+            {{ relativeTime(reading.lastActivityAt, now) }}
           </time>
           <span v-else class="muted">None yet</span>
         </td>

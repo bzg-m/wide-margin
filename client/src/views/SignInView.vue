@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { Role, type User } from '../../../shared/api.ts';
 import { isServerUnreachable } from '../api/client.ts';
 import { listUsers } from '../api/index.ts';
-import { RouteName } from '../navigation.ts';
+import { afterSignIn } from '../navigation.ts';
 import { useSession } from '../stores/session.ts';
 
 const session = useSession();
@@ -41,8 +41,7 @@ async function choose(user: User) {
   signInError.value = '';
   try {
     await session.signInAs(user.id);
-    const redirect = route.query.redirect;
-    await router.push(typeof redirect === 'string' ? redirect : { name: RouteName.Readings });
+    await router.push(afterSignIn(route.query));
   } catch (error) {
     if (isServerUnreachable(error)) return;
     signInError.value = error instanceof Error ? error.message : 'Signing in failed.';

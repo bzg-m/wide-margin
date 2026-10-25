@@ -65,17 +65,19 @@ Hono's `streamSSE` returns a response whose body stays open while its callback r
 
 When the browser closes the connection (the tab closes, or the user leaves the reading), Hono marks the stream as aborted. The `onAbort` handler unsubscribes the listener, so the reading stops sending to it, and the heartbeat loop ends when it next wakes.
 
-The browser's `EventSource` reconnects on its own after an unexpected drop, such as the server restarting.
+The browser's `EventSource` reconnects on its own after an unexpected drop, such as the server restarting. After an error response, such as a 401 or 404, it closes the stream for good.
 
 ## What the client does with events
 
-The client follows these rules:
+The client's side lives in [client/src/live.ts](../client/src/live.ts), which wraps `EventSource`, and the discussion store, [client/src/stores/discussion.ts](../client/src/stores/discussion.ts). It follows these rules:
 
-- **Open the stream first, and load the reading after `ready`.** Loading first would leave a gap: anything posted between the load and the subscription would be lost.
-- **Merge everything by ID.** The author's own post arrives twice, once in the create response and once on the stream, and must appear once.
-- **Merge fetched data into what's on screen; never replace it.** A fetch can return a snapshot taken just before a new reply was saved, after that reply's event has already arrived. Replacing the list with the fetch result would lose the reply.
-- **After a reconnect, reload** the thread list and the replies of any open thread. Events carry no IDs, so the server can't replay what was missed; reloading is simpler and always correct.
-- **Update counts from events.** A `reply.created` event raises its thread's reply count and moves its last-activity time, whether or not the thread is open.
+- **Every `ready` means re-read.** The page loads the reading straight away, so it appears quickly, and opens the stream alongside. Each `ready`, on the first connection and after every reconnect, re-reads the reading and its threads and reloads the replies of any open thread. Anything posted before the stream was listening, or while it was disconnected, arrives that way. Events carry no IDs, so the server can't replay what was missed; re-reading is simpler and always correct.
+- **Each post is counted once, by ID.** The author's own post arrives twice, once in the create response and once on the stream. The second copy changes nothing.
+- **Counts update at once, then the server's replace them.** A new post, from the stream or your own, raises its thread's and reading's counts and moves their last activity. About 300 ms later, a re-read from the server replaces them.
+- **Only an up-to-date re-read is applied.** A re-read that started before a later change, or before another re-read that has already been applied, is ignored. An older response can therefore never undo a newer post. A post that arrives before the reading has first loaded schedules a fresh re-read, which starts after the post and so includes it.
+- **A reply can briefly be counted twice.** A re-read returns counts, not the replies behind them, so if its counts already include a reply whose event arrives afterwards, the event adds one more. That event also schedules a re-read, which corrects the count within about 300 ms plus a request. Making it exact would mean events carrying the server's counts, which isn't worth it for a blip that fixes itself.
+- **Problems show in the status area.** A dropped connection shows "Live updates paused. Reconnecting…", and a stream closed for good shows "Live updates stopped." with a Reconnect button. Both rank below "Can't reach the server", so a server outage shows one message. While connected, the discussion shows a quiet "Live updates on".
+- **New threads don't move what you're reading.** When the top of the thread list is out of view, a button counts other people's new threads and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as threads are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new thread's height.
 
 ## Limits at scale
 

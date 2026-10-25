@@ -2,7 +2,9 @@ import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role, type Annotation, type Reading, type Reply } from '../../../shared/api.ts';
 import * as api from '../api/index.ts';
+import { connectToReading, type LiveHandlers } from '../live.ts';
 import { useDiscussion } from './discussion.ts';
+import { useSession } from './session.ts';
 
 vi.mock('../api/index.ts', () => ({
   getReading: vi.fn(),
@@ -11,6 +13,8 @@ vi.mock('../api/index.ts', () => ({
   createAnnotation: vi.fn(),
   createReply: vi.fn(),
 }));
+
+vi.mock('../live.ts', () => ({ connectToReading: vi.fn() }));
 
 const reading = (replyCount: number): Reading => ({
   id: '1',
@@ -35,6 +39,13 @@ const thread = (replyCount: number, text = 'A thread'): Annotation => ({
   lastActivityAt: '2026-10-02T00:00:00.000Z',
 });
 
+const newThread = (id: string, authorId: string): Annotation => ({
+  ...thread(0),
+  id,
+  authorId,
+  createdAt: '2026-10-05T00:00:00.000Z',
+});
+
 const reply = (id: string): Reply => ({
   id,
   annotationId: '10',
@@ -53,12 +64,21 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-describe('discussion store re-reads', () => {
+describe('discussion store', () => {
+  // What the store passed to the event stream, so tests can play the server's part.
+  let live: LiveHandlers;
+
   beforeEach(async () => {
     setActivePinia(createPinia());
+    useSession().user = { id: '3', displayName: 'Sarah', role: Role.Student };
     vi.useFakeTimers();
+    vi.mocked(connectToReading).mockImplementation((_id, handlers) => {
+      live = handlers;
+      return vi.fn();
+    });
     vi.mocked(api.getReading).mockResolvedValue(reading(0));
     vi.mocked(api.listAnnotations).mockResolvedValue([thread(0)]);
+    vi.mocked(api.listReplies).mockResolvedValue([]);
     vi.mocked(api.createReply).mockImplementation(async (_r, _a, body) => reply(body.text));
     await useDiscussion().show('1');
   });
@@ -68,28 +88,98 @@ describe('discussion store re-reads', () => {
     vi.resetAllMocks();
   });
 
-  it('ignores a re-read that started before a later change', async () => {
-    const discussion = useDiscussion();
-    const staleThreads = deferred<Annotation[]>();
-    await discussion.postReply('10', { text: '5' }, 'key-5');
-    vi.mocked(api.listAnnotations).mockReturnValueOnce(staleThreads.promise);
-    await vi.advanceTimersByTimeAsync(300); // The first re-read starts and waits.
+  describe('re-reads', () => {
+    it('ignores a re-read that started before a later change', async () => {
+      const discussion = useDiscussion();
+      const staleThreads = deferred<Annotation[]>();
+      await discussion.postReply('10', { text: '5' }, 'key-5');
+      vi.mocked(api.listAnnotations).mockReturnValueOnce(staleThreads.promise);
+      await vi.advanceTimersByTimeAsync(300); // The first re-read starts and waits.
 
-    await discussion.postReply('10', { text: '6' }, 'key-6');
-    staleThreads.resolve([thread(1)]); // Started before reply 6, so it only knows of one reply.
-    await vi.advanceTimersByTimeAsync(0);
+      await discussion.postReply('10', { text: '6' }, 'key-6');
+      staleThreads.resolve([thread(1)]); // Started before reply 6, so it only knows of one reply.
+      await vi.advanceTimersByTimeAsync(0);
 
-    expect(discussion.threads[0].replyCount).toBe(2);
+      expect(discussion.threads[0].replyCount).toBe(2);
+    });
+
+    it('ignores a re-read that finishes after a later one has been applied', async () => {
+      const discussion = useDiscussion();
+      const slowThreads = deferred<Annotation[]>();
+      vi.mocked(api.listAnnotations)
+        .mockReturnValueOnce(slowThreads.promise)
+        .mockResolvedValueOnce([thread(2, 'Newer')]);
+
+      live.onReady(); // Starts a re-read that waits.
+      live.onReady(); // Starts a later re-read, which finishes first.
+      await vi.advanceTimersByTimeAsync(0);
+      slowThreads.resolve([thread(1, 'Older')]);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(discussion.threads[0].text).toBe('Newer');
+    });
+
+    it('replaces the counts with a re-read that started after every change', async () => {
+      const discussion = useDiscussion();
+      await discussion.postReply('10', { text: '5' }, 'key-5');
+      vi.mocked(api.listAnnotations).mockResolvedValueOnce([thread(1, 'From the server')]);
+      vi.mocked(api.getReading).mockResolvedValueOnce(reading(1));
+
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(discussion.threads[0].text).toBe('From the server');
+    });
   });
 
-  it('replaces the counts with a re-read that started after every change', async () => {
-    const discussion = useDiscussion();
-    await discussion.postReply('10', { text: '5' }, 'key-5');
-    vi.mocked(api.listAnnotations).mockResolvedValueOnce([thread(1, 'From the server')]);
-    vi.mocked(api.getReading).mockResolvedValueOnce(reading(1));
+  describe('live updates', () => {
+    it("re-reads, and reloads open threads' replies, on every ready", async () => {
+      const discussion = useDiscussion();
+      await discussion.loadReplies('10');
+      vi.clearAllMocks();
 
-    await vi.advanceTimersByTimeAsync(300);
+      live.onReady();
+      await vi.advanceTimersByTimeAsync(0);
 
-    expect(discussion.threads[0].text).toBe('From the server');
+      expect(api.listAnnotations).toHaveBeenCalledTimes(1);
+      expect(api.listReplies).toHaveBeenCalledWith('1', '10');
+    });
+
+    it('re-reads when a post arrives before the reading has loaded', async () => {
+      const discussion = useDiscussion();
+      const firstLoad = deferred<Annotation[]>();
+      vi.mocked(api.listAnnotations)
+        .mockReturnValueOnce(firstLoad.promise)
+        .mockResolvedValueOnce([newThread('11', '2'), thread(0)]);
+
+      const showing = discussion.show('1');
+      live.onThread(newThread('11', '2'));
+      firstLoad.resolve([thread(0)]); // Started before thread 11 was saved.
+      await showing;
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(discussion.threads.map((t) => t.id)).toContain('11');
+    });
+
+    it('applies a post from the stream once, even if its create response already did', async () => {
+      const discussion = useDiscussion();
+      await discussion.postReply('10', { text: '5' }, 'key-5');
+
+      live.onReply(reply('5'));
+
+      expect(discussion.threads[0].replyCount).toBe(1);
+    });
+
+    it("counts other people's new threads while the top is out of view, and resets when it's back", () => {
+      const discussion = useDiscussion();
+      discussion.setTopInView(false);
+
+      live.onThread(newThread('11', '2'));
+      live.onThread(newThread('12', '3')); // Sarah's own thread isn't news to her.
+      const whileScrolled = discussion.unseenNewThreads;
+      discussion.setTopInView(true);
+
+      expect(whileScrolled).toBe(1);
+      expect(discussion.unseenNewThreads).toBe(0);
+    });
   });
 });
