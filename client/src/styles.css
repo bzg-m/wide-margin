@@ -1,0 +1,112 @@
+/* Every color is a custom property, so a theme is one set of values. */
+:root {
+  color-scheme: light;
+  --color-page: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-text: #1f1f1d;
+  --color-text-muted: #66645e;
+  --color-border: #e2e0da;
+  --color-accent: #2f5fb3;
+  --color-accent-text: #ffffff;
+  --color-instructor: #eaf0fb;
+  --color-instructor-text: #23488a;
+  --color-danger: #b42318;
+  --color-warning: #fdf3dc;
+  --color-warning-text: #7a4b00;
+  --color-focus: #2f5fb3;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --radius: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --content-width: 72rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-page: #171716;
+    --color-surface: #222220;
+    --color-text: #ecebe7;
+    --color-text-muted: #a5a39c;
+    --color-border: #3a3936;
+    --color-accent: #8db0ef;
+    --color-accent-text: #10203d;
+    --color-instructor: #1f2c45;
+    --color-instructor-text: #b7cdf5;
+    --color-danger: #f29b92;
+    --color-warning: #3d3012;
+    --color-warning-text: #f5d58c;
+    --color-focus: #8db0ef;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 var(--space-3);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The centered column every page sits in, with a 16px margin on narrow screens. */
+.content {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* A plain, quiet button. Add .primary for the one main action on a page. */
+.button {
+  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.button.primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}
