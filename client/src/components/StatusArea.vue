@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useStatus } from '../stores/status.ts';
 
-/** Shows the most important problem that no user action caused, if any, with an optional Retry. */
+/** Shows the most important problem that no user action caused, if any, with its action. */
 const status = useStatus();
 </script>
 
@@ -10,12 +10,12 @@ const status = useStatus();
     <div v-if="status.current" class="status-message">
       <span>{{ status.current.message }}</span>
       <button
-        v-if="status.current.retry"
+        v-if="status.current.action"
         type="button"
         class="button"
-        @click="status.current.retry"
+        @click="status.current.action.run"
       >
-        Retry
+        {{ status.current.action.label }}
       </button>
     </div>
   </div>

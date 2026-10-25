@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, createApiClient } from './client.ts';
+import { ApiError, createApiClient, isShownInStatusArea } from './client.ts';
 
 type FakeResponse =
   number | 'network-error' | { status: number; body?: unknown; headers?: Record<string, string> };
@@ -12,6 +12,7 @@ function fakeClient(responses: FakeResponse[]) {
   const calls: { url: string; init: RequestInit }[] = [];
   const waits: number[] = [];
   const reachability: boolean[] = [];
+  let unauthorizedCalls = 0;
   const client = createApiClient({
     fetch: async (url, init) => {
       calls.push({ url: String(url), init: init ?? {} });
@@ -32,8 +33,11 @@ function fakeClient(responses: FakeResponse[]) {
     onServerReachable: (reachable) => {
       reachability.push(reachable);
     },
+    onUnauthorized: () => {
+      unauthorizedCalls++;
+    },
   });
-  return { client, calls, waits, reachability };
+  return { client, calls, waits, reachability, unauthorizedCalls: () => unauthorizedCalls };
 }
 
 describe('request', () => {
@@ -133,6 +137,23 @@ describe('connection reports', () => {
 
     await expect(client.request('/readings/9')).rejects.toBeInstanceOf(ApiError);
     expect(reachability).toEqual([true]);
+  });
+});
+
+describe('isShownInStatusArea', () => {
+  it('covers lost connections and ended sign-ins, but not other errors', () => {
+    expect(isShownInStatusArea(new ApiError(0, 'down', { serverUnreachable: true }))).toBe(true);
+    expect(isShownInStatusArea(new ApiError(401, 'signed out'))).toBe(true);
+    expect(isShownInStatusArea(new ApiError(403, 'not allowed'))).toBe(false);
+  });
+});
+
+describe('sign-in reports', () => {
+  it('calls onUnauthorized when a request gets a 401', async () => {
+    const { client, unauthorizedCalls } = fakeClient([401]);
+
+    await expect(client.request('/readings')).rejects.toMatchObject({ status: 401 });
+    expect(unauthorizedCalls()).toBe(1);
   });
 });
 

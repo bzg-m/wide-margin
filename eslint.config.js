@@ -8,7 +8,13 @@ export default tseslint.config(
   js.configs.recommended,
   tseslint.configs.recommended,
   pluginVue.configs['flat/recommended'],
-  { files: ['**/*.vue'], languageOptions: { parserOptions: { parser: tseslint.parser } } },
+  {
+    files: ['**/*.vue'],
+    languageOptions: { parserOptions: { parser: tseslint.parser } },
+    // vue-tsc already reports undefined names, and this rule doesn't know browser or TypeScript
+    // globals. typescript-eslint turns it off for .ts files; this does the same for .vue files.
+    rules: { 'no-undef': 'off' },
+  },
   {
     rules: {
       // Allows `const { omitted, ...rest } = object`, the usual way to copy an object without a field.

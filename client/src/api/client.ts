@@ -32,9 +32,17 @@ export class ApiError extends Error {
   }
 }
 
-/** True if the error means the server couldn't be reached, which the status area already shows. */
+/** True if the error means the server couldn't be reached. */
 export function isServerUnreachable(error: unknown): boolean {
   return error instanceof ApiError && error.serverUnreachable;
+}
+
+/**
+ * True if the status area already shows this error, so a page shouldn't repeat it: a lost
+ * connection, or a 401 meaning the sign-in ended.
+ */
+export function isShownInStatusArea(error: unknown): boolean {
+  return isServerUnreachable(error) || (error instanceof ApiError && error.status === 401);
 }
 
 /** Options for one API request. */
@@ -54,6 +62,8 @@ export type ApiDependencies = {
   random: () => number;
   /** Called after each request: false when the server couldn't be reached, true when it answered. */
   onServerReachable?: (reachable: boolean) => void;
+  /** Called when a request gets a 401: the server no longer considers anyone signed in. */
+  onUnauthorized?: () => void;
 };
 
 /** The real implementations, used unless a caller passes its own. */
@@ -101,6 +111,7 @@ export function createApiClient(deps: ApiDependencies = defaultDependencies) {
       if (!response.ok) {
         const error = await toApiError(response);
         deps.onServerReachable?.(!error.serverUnreachable);
+        if (response.status === 401) deps.onUnauthorized?.();
         throw error;
       }
       deps.onServerReachable?.(true);

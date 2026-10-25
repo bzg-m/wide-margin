@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 /** How important a status problem is. When several are active, the most important is shown. */
-export const Priority = { LiveUpdates: 1, Server: 2 } as const;
+export const Priority = { LiveUpdates: 1, Server: 2, SignedOut: 3 } as const;
 /** One of the values of `Priority`. */
 export type Priority = (typeof Priority)[keyof typeof Priority];
 
@@ -14,10 +14,11 @@ export type StatusProblem = {
   message: string;
   priority: Priority;
   /**
-   * If given, the status area shows a Retry button that calls this. It should start over
-   * whatever failed; the problem stays shown until something calls `resolve`.
+   * If given, the status area shows a button with this label that calls `run`. It should start
+   * over whatever failed, or take the user where they can fix it. The problem stays shown until
+   * something calls `resolve`, which `run` itself may do.
    */
-  retry?: () => void;
+  action?: { label: string; run: () => void };
 };
 
 /** Problems shown in the status area, one at a time, so several failures never stack up. */

@@ -1,18 +1,48 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { Role } from '../../shared/api.ts';
-import { isServerUnreachable } from './api/client.ts';
+import { isShownInStatusArea } from './api/client.ts';
+import { onUnauthorized } from './api/index.ts';
 import StatusArea from './components/StatusArea.vue';
 import { RouteName } from './navigation.ts';
 import { useSession } from './stores/session.ts';
+import { Priority, useStatus } from './stores/status.ts';
+
+const SIGNED_OUT_PROBLEM = 'signed-out';
 
 const session = useSession();
+const status = useStatus();
+const route = useRoute();
 const router = useRouter();
 
 // The first page waits for the sign-in check, which can take a few seconds of retries.
 const firstPageReady = ref(false);
 void router.isReady().finally(() => (firstPageReady.value = true));
+
+/** Goes to sign-in, coming back to this page afterwards. */
+function goToSignIn() {
+  void router.push({ name: RouteName.SignIn, query: { redirect: route.fullPath } });
+}
+
+// A 401 means the sign-in ended elsewhere, such as in another tab. The page stays where it is,
+// with anything typed, and the status area offers to sign in again.
+onUnauthorized(() => {
+  if (!session.user) return;
+  status.report({
+    id: SIGNED_OUT_PROBLEM,
+    message: "You've been signed out, so new posts can't be saved.",
+    priority: Priority.SignedOut,
+    action: {
+      label: 'Sign in',
+      run: () => {
+        status.resolve(SIGNED_OUT_PROBLEM);
+        session.forget();
+        goToSignIn();
+      },
+    },
+  });
+});
 
 const signOutError = ref('');
 
@@ -21,11 +51,11 @@ async function switchUser() {
   try {
     await session.signOutCurrent();
   } catch (error) {
-    // A lost connection is already shown in the status area.
-    if (!isServerUnreachable(error)) signOutError.value = "Couldn't sign out. Try again.";
+    // Lost connections and ended sign-ins are already shown in the status area.
+    if (!isShownInStatusArea(error)) signOutError.value = "Couldn't sign out. Try again.";
     return;
   }
-  await router.push({ name: RouteName.SignIn });
+  goToSignIn();
 }
 </script>
 

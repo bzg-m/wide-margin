@@ -34,5 +34,10 @@ export const useSession = defineStore('session', () => {
     user.value = null;
   }
 
-  return { user, checked, check, signInAs, signOutCurrent };
+  /** Forgets the user locally, once the server has said they're no longer signed in. */
+  function forget(): void {
+    user.value = null;
+  }
+
+  return { user, checked, check, signInAs, signOutCurrent, forget };
 });

@@ -15,14 +15,15 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 ## Interface
 
-- **New readings are written in a side panel, not in the table.** The list stays usable while the panel is open, so an instructor can sort and scroll existing readings while choosing a title. A form inside the table would break as soon as the table was re-sorted. On phones, the form is its own screen.
+- **New readings are written in a side panel, not in the table.** The list stays usable while the panel is open, so an instructor can sort and scroll existing readings while choosing a title. A form inside the table would break as soon as the table was re-sorted. On phones, the form is its own screen. The table follows its own column's width (a CSS container query), so it becomes cards whenever the panel makes it narrow, not only on phones.
 - **The reading view has two columns on wide screens.** The reading's title, description and counts stay in view on the left while the discussion scrolls on the right. On phones they stack, and the description collapses.
 - **Threads open in place.** Opening a thread expands its replies beneath it. The same layout works at every screen size, and several threads can be open at once.
 - **Composers are multi-line with an explicit Post button.** Enter adds a line, and Ctrl+Enter (or Cmd+Enter) posts. The new-thread box sits above the threads, where new threads appear; the reply box sits at the end of an open thread, after its newest reply.
 - **Live-update status is shown with the discussion, not next to a person.** A dot by a name usually means that person is online. A quiet "Live updates on" line changes to "Reconnecting…" when the stream drops.
 - **New threads don't move what you're reading.** If you're scrolled down, a "1 new thread" button appears instead of inserting content above you.
-- **Feedback stays proportionate.** A new post appearing is its own confirmation; toasts are only for results you can't see, such as a new reading sorted off screen. An error caused by an action appears next to that action. Problems with no triggering action share one status area that shows the most important one, so several failures never stack up.
+- **Feedback stays proportionate.** A new post appearing is its own confirmation, and a new reading is placed first in the list with a short line confirming it. An error caused by an action appears next to that action. Problems with no triggering action share one status area that shows the most important one, so several failures never stack up.
 - **A lost connection is shown only in the status area,** whichever request discovers it, and it clears as soon as any request gets an answer. Pages and actions don't repeat it, so there's one message and one Retry button. The API client reports the connection after every request, which keeps the rule in one place.
+- **The app never leaves a page on its own.** When a request finds the sign-in has ended (a 401, for example after signing out in another tab), the status area says so and offers Sign in. The page, and anything typed on it, stays until the user chooses. A refused permission (a 403) is an ordinary error for the action that caused it.
 - **Light and dark themes.** The app follows the system setting and offers a manual switch. Every color is a CSS custom property, so a theme is one set of values.
 - **"Expand all" is deferred.** With replies loading per thread, expanding every thread would mean one request per thread. An endpoint returning all of a reading's replies would make it cheap, and instructor review is the case that would justify it.
 - **Reading titles use a serif font.** The material reads differently from the discussion around it.
@@ -69,7 +70,7 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Reliability and caching
 
 - **Failed requests are retried automatically** after network errors, 5xx and 429 responses, with growing randomized delays, up to three times. Only requests that are safe to repeat are retried: reads, creates carrying an idempotency key, and signing in or out. Other 4xx responses are not retried. A 502, 503 or 504 with no details is reported as "Can't reach the server", since that's what a proxy sends when the server behind it is down.
-- **Creates are safe to retry.** Each carries an `Idempotency-Key` header, which the server stores with a uniqueness constraint. A repeated key returns the resource created the first time, and the same key with different content is rejected with a 422, as the IETF `Idempotency-Key` draft specifies.
+- **Creates are safe to retry.** Each carries an `Idempotency-Key` header, which the server stores with a uniqueness constraint. A repeated key returns the resource created the first time, and the same key with different content is rejected with a 422, as the IETF `Idempotency-Key` draft specifies. The client reuses a key only while the content is unchanged; edited content is a new request with a new key. After a create succeeds, the list refreshes, so an earlier send that reached the server before a lost connection also appears.
 - **There is no caching layer.** The data changes often and the stream keeps it current. The browser caches build files, and the client keeps loaded data in memory between views. At scale, stored counters and ETags would come first.
 
 ## Security
@@ -115,3 +116,4 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Open
 
 - **Optional enhancements:** filter by student, search, a participation dashboard, editing and deleting.
+- **Edited retries after a lost connection:** if the first send was saved before the connection dropped, sending an edited version creates a second reading. Editing readings would let the app offer to apply the changes to the saved one instead.
