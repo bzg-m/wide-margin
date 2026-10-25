@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Role, type Reading } from '../../../shared/api.ts';
+import type { Reading } from '../../../shared/api.ts';
 import { Action, can } from '../../../shared/permissions.ts';
 import { isServerUnreachable, isShownInStatusArea } from '../api/client.ts';
-import { listUsers } from '../api/index.ts';
+import { countStudents } from '../api/index.ts';
 import NewReadingPanel from '../components/NewReadingPanel.vue';
 import ReadingsTable from '../components/ReadingsTable.vue';
 import { defaultSort, nextSort, sortReadings, SortKey, type Sort } from '../readings.ts';
@@ -60,15 +60,26 @@ async function load() {
   waitingForServer.value = false;
   try {
     await readings.refresh();
-    if (canSeeParticipation.value && studentCount.value === null) {
-      studentCount.value = (await listUsers()).filter((u) => u.role === Role.Student).length;
-    }
   } catch (error) {
-    if (isServerUnreachable(error)) waitingForServer.value = true;
-    else if (!isShownInStatusArea(error))
+    if (isServerUnreachable(error)) {
+      waitingForServer.value = true;
+    } else if (!isShownInStatusArea(error)) {
       loadError.value = error instanceof Error ? error.message : 'Readings failed to load.';
+    }
   } finally {
     loading.value = false;
+  }
+  void loadStudentCount();
+}
+
+// The class size only adds "of 12" to the Students column, so if it fails to load, the list
+// still shows, without it. A lost connection is shown in the status area.
+async function loadStudentCount() {
+  if (!canSeeParticipation.value || studentCount.value !== null) return;
+  try {
+    studentCount.value = await countStudents();
+  } catch {
+    // Leave it unknown.
   }
 }
 

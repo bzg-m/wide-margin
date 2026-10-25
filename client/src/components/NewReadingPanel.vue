@@ -11,21 +11,31 @@ import { characterCount } from '../../../shared/text.ts';
 import { ApiError, isShownInStatusArea } from '../api/client.ts';
 import { createReading } from '../api/index.ts';
 import { attemptFor, type Attempt } from '../idempotency.ts';
+import { useDrafts } from '../stores/drafts.ts';
 
 /** A form for creating a reading, shown beside the readings list. */
 const emit = defineEmits<{ created: [reading: Reading]; cancel: [] }>();
 
-const title = ref('');
-const description = ref('');
+const DRAFT_KEY = 'reading:new';
+
+// The fields live in a draft, so leaving the page (for example, to sign in again) keeps them.
+const drafts = useDrafts();
+const draft = drafts.draftFor(DRAFT_KEY);
+const title = computed({
+  get: () => draft.fields.title ?? '',
+  set: (value: string) => (draft.fields.title = value),
+});
+const description = computed({
+  get: () => draft.fields.description ?? '',
+  set: (value: string) => (draft.fields.description = value),
+});
 const fieldErrors = ref<Record<string, string>>({});
 const formError = ref('');
 const sending = ref(false);
-// The last unsuccessful send. Sending the same content again reuses its idempotency key.
+// The draft keeps the last unsuccessful send; sending the same content again reuses its key.
 // TODO: if a send failed with an unknown outcome (the connection was lost) and the user edits
 // before sending again, the earlier version may also have been saved, leaving two readings.
 // Once readings can be edited, offer to apply the changes to the saved one instead.
-let lastAttempt: Attempt<CreateReadingBody> | undefined;
-
 const titleInput = useTemplateRef<HTMLInputElement>('title-input');
 onMounted(() => titleInput.value?.focus());
 
@@ -49,11 +59,14 @@ async function submit() {
     return;
   }
   sending.value = true;
-  const attempt = attemptFor(parsed.data, lastAttempt);
-  lastAttempt = attempt;
+  const attempt = attemptFor(
+    parsed.data,
+    draft.lastAttempt as Attempt<CreateReadingBody> | undefined,
+  );
+  draft.lastAttempt = attempt;
   try {
     const reading = await createReading(attempt.body, attempt.key);
-    lastAttempt = undefined;
+    drafts.clear(DRAFT_KEY);
     emit('created', reading);
   } catch (error) {
     // The status area shows lost connections and ended sign-ins; the draft stays for another try.
@@ -68,13 +81,19 @@ async function submit() {
     sending.value = false;
   }
 }
+
+/** Closes the form and throws away what was typed. */
+function discard() {
+  drafts.clear(DRAFT_KEY);
+  emit('cancel');
+}
 </script>
 
 <template>
   <section class="panel" aria-labelledby="new-reading-heading">
     <div class="panel-heading">
       <h2 id="new-reading-heading">New reading</h2>
-      <button type="button" class="close" aria-label="Close" @click="emit('cancel')">×</button>
+      <button type="button" class="close" aria-label="Close" @click="discard">×</button>
     </div>
     <form novalidate @submit.prevent="submit">
       <label for="reading-title">Title</label>
@@ -113,7 +132,7 @@ async function submit() {
         <button type="submit" class="button primary">
           {{ sending ? 'Creating…' : 'Create reading' }}
         </button>
-        <button type="button" class="button" @click="emit('cancel')">Cancel</button>
+        <button type="button" class="button" @click="discard">Cancel</button>
       </div>
     </form>
   </section>

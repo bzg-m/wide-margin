@@ -1,10 +1,15 @@
-import type {
-  ListReadingsResponse,
-  ListUsersResponse,
-  Reading,
-  User,
+import {
+  Role,
+  type Annotation,
+  type ListAnnotationsResponse,
+  type ListReadingsResponse,
+  type ListRepliesResponse,
+  type ListUsersResponse,
+  type Reading,
+  type Reply,
+  type User,
 } from '../../../shared/api.ts';
-import type { CreateReadingBody } from '../../../shared/schemas.ts';
+import type { CreatePostBody, CreateReadingBody } from '../../../shared/schemas.ts';
 import { Priority, useStatus } from '../stores/status.ts';
 import { createApiClient, defaultDependencies } from './client.ts';
 
@@ -63,3 +68,48 @@ export const listReadings = () =>
 /** Creates a reading. The same idempotency key must be used for every attempt at one draft. */
 export const createReading = (body: CreateReadingBody, idempotencyKey: string) =>
   api.request<Reading>('/readings', { method: 'POST', body, idempotencyKey });
+
+/** How many students are in the class, for "5 of 12 students participating". */
+export async function countStudents(): Promise<number> {
+  return (await listUsers()).filter((user) => user.role === Role.Student).length;
+}
+
+// IDs come from the URL, so they're encoded before going into a request path.
+const readingPath = (readingId: string) => `/readings/${encodeURIComponent(readingId)}`;
+const threadsPath = (readingId: string) => `${readingPath(readingId)}/annotations`;
+const repliesPath = (readingId: string, annotationId: string) =>
+  `${threadsPath(readingId)}/${encodeURIComponent(annotationId)}/replies`;
+
+/** One reading, with its counts. */
+export const getReading = (readingId: string) => api.request<Reading>(readingPath(readingId));
+
+/** Every thread on a reading, newest first. */
+export const listAnnotations = (readingId: string) =>
+  api.listAll<Annotation>(
+    threadsPath(readingId),
+    'annotations' satisfies keyof ListAnnotationsResponse,
+  );
+
+/** Every reply in a thread, oldest first. */
+export const listReplies = (readingId: string, annotationId: string) =>
+  api.listAll<Reply>(
+    repliesPath(readingId, annotationId),
+    'replies' satisfies keyof ListRepliesResponse,
+  );
+
+/** Starts a thread. The same idempotency key must be used for every attempt at one post. */
+export const createAnnotation = (readingId: string, body: CreatePostBody, idempotencyKey: string) =>
+  api.request<Annotation>(threadsPath(readingId), { method: 'POST', body, idempotencyKey });
+
+/** Replies in a thread. The same idempotency key must be used for every attempt at one post. */
+export const createReply = (
+  readingId: string,
+  annotationId: string,
+  body: CreatePostBody,
+  idempotencyKey: string,
+) =>
+  api.request<Reply>(repliesPath(readingId, annotationId), {
+    method: 'POST',
+    body,
+    idempotencyKey,
+  });
