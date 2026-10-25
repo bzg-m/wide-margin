@@ -9,5 +9,11 @@ export default tseslint.config(
   tseslint.configs.recommended,
   pluginVue.configs['flat/recommended'],
   { files: ['**/*.vue'], languageOptions: { parserOptions: { parser: tseslint.parser } } },
+  {
+    rules: {
+      // Allows `const { omitted, ...rest } = object`, the usual way to copy an object without a field.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+    },
+  },
   prettier,
 );

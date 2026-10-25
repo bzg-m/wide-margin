@@ -15,7 +15,8 @@ export type Reading = {
   createdAt: string;
   threadCount: number;
   replyCount: number;
-  participatingStudentCount: number;
+  /** Distinct students who have posted. Present only for users allowed to view participation. */
+  participatingStudentCount?: number;
   /** When the newest post was made, or null if there are none. */
   lastActivityAt: string | null;
 };

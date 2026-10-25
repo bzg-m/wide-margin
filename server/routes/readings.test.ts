@@ -112,9 +112,19 @@ describe('readings', () => {
     addPost(db, { readingId: reading.id, authorId: student.id, threadId: thread });
     addPost(db, { readingId: reading.id, authorId: instructor.id, threadId: thread });
 
-    const found = await (await request(student, `/v1/readings/${reading.id}`)).json();
+    const found = await (await request(instructor, `/v1/readings/${reading.id}`)).json();
 
     expect(found.participatingStudentCount).toBe(1);
+  });
+
+  it('hides participation from students', async () => {
+    const { db, request, student, instructor } = createTestApp();
+    const reading: Reading = await (await postReading(request, instructor)).json();
+    addPost(db, { readingId: reading.id, authorId: student.id });
+
+    const found = await (await request(student, `/v1/readings/${reading.id}`)).json();
+
+    expect(found).not.toHaveProperty('participatingStudentCount');
   });
 
   it('pages through readings newest first', async () => {

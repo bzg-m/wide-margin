@@ -45,7 +45,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **Resources:** `users`, `readings`, `readings/{id}/annotations` and `readings/{id}/annotations/{id}/replies`, under `/v1`. Replies sit under their annotation because each belongs to exactly one.
 - **Methods are List and Get, plus Create for readings, annotations and replies.** Update and Delete can be added later without breaking clients.
 - **Replies load when a thread is opened.** The thread list includes each thread's `replyCount` and `lastActivityAt`, which keeps the first load small.
-- **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call.
+- **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call. The participation count is left out of responses for users who may not view it, so the server enforces the rule rather than the UI hiding it.
 - **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`; 50 items by default, at most 100). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: threads are newest first and never deleted, so a thread posted mid-load can only cause a repeated item, which the client discards.
 - **Errors use RFC 9457 Problem Details** (`application/problem+json`). An `errors` list carries field-level problems for the UI to show next to each field.
 - **The stored format and the API format are separate.** A small mapping function per resource turns database rows into API objects and keeps internal columns private, so storage can change without changing the API.
