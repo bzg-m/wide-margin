@@ -12,26 +12,28 @@ The response is plain text. Each event is a few `field: value` lines followed by
 event: annotation.created
 data: {"id":"12","text":"Why divide by the square root?", ...}
 
-: heartbeat
+event: heartbeat
+data:
 
 event: reply.created
 data: {"id":"40","annotationId":"12", ...}
 
 ```
 
-`event` names the kind of message and `data` carries it, here as JSON. A line starting with `:` is a comment, which the browser ignores.
+`event` names the kind of message and `data` carries it, here as JSON. A line starting with `:` is a comment, which the browser reads but never passes to the page.
 
 SSE only sends from server to client. That's all the app needs, because posting goes through the normal API.
 
 ## The stream for a reading
 
-Each reading has its own stream at `GET /v1/readings/:readingId/events` ([server/routes/readings.ts](../server/routes/readings.ts)). It sends three events, named in `EventName` ([shared/api.ts](../shared/api.ts)):
+Each reading has its own stream at `GET /v1/readings/:readingId/events` ([server/routes/readings.ts](../server/routes/readings.ts)). It sends four events, named in `EventName` ([shared/api.ts](../shared/api.ts)):
 
-| Event                | Data                 | Sent when                                                    |
-| -------------------- | -------------------- | ------------------------------------------------------------ |
-| `ready`              | none                 | The stream is listening. Anything posted after this arrives. |
-| `annotation.created` | the new `Annotation` | Someone starts a thread on the reading.                      |
-| `reply.created`      | the new `Reply`      | Someone replies in one of the reading's threads.             |
+| Event                | Data                 | Sent when                                                        |
+| -------------------- | -------------------- | ---------------------------------------------------------------- |
+| `ready`              | none                 | The stream is listening. Anything posted after this arrives.     |
+| `heartbeat`          | none                 | Every 15 seconds, so a quiet stream can be told from a dead one. |
+| `annotation.created` | the new `Annotation` | Someone starts a thread on the reading.                          |
+| `reply.created`      | the new `Reply`      | Someone replies in one of the reading's threads.                 |
 
 The stream requires a signed-in user like the rest of the API. The browser's `EventSource` sends the sign-in cookie, because the page and the API share one origin.
 
@@ -59,13 +61,15 @@ Hono's `streamSSE` returns a response whose body stays open while its callback r
 
 1. **Subscribes** to the reading's events.
 2. **Sends `ready`.** Because the subscription already exists, a client that has seen `ready` can't miss anything posted afterwards. The browser's own `open` event isn't enough for this, because it fires when the response headers arrive, which says nothing about the subscription.
-3. **Sends a heartbeat comment every 25 seconds** until the connection closes. Proxies often close connections that have been silent for 30 to 60 seconds; the heartbeat keeps the stream from looking idle.
+3. **Sends a `heartbeat` event every 15 seconds** until the connection closes. It does two jobs. Proxies often close connections that have been silent for 30 to 60 seconds, and the heartbeat keeps the stream from looking idle. It also lets the client tell a quiet stream from a dead one, which is why it is a named event: `EventSource` never passes comments to the page.
 
 ## Disconnecting
 
 When the browser closes the connection (the tab closes, or the user leaves the reading), Hono marks the stream as aborted. The `onAbort` handler unsubscribes the listener, so the reading stops sending to it, and the heartbeat loop ends when it next wakes.
 
 The browser's `EventSource` reconnects on its own after an unexpected drop, such as the server restarting. After an error response, such as a 401 or 404, it closes the stream for good.
+
+The browser can't always tell that a connection has died. A network can drop without a word, and a proxy can keep the browser's side open after the server behind it has stopped. The client covers this itself, as described below.
 
 ## What the client does with events
 
@@ -76,6 +80,7 @@ The client's side lives in [client/src/live.ts](../client/src/live.ts), which wr
 - **Counts update at once, then the server's replace them.** A new post, from the stream or your own, raises its thread's and reading's counts and moves their last activity. About 300 ms later, a re-read from the server replaces them.
 - **Only an up-to-date re-read is applied.** A re-read that started before a later change, or before another re-read that has already been applied, is ignored. An older response can therefore never undo a newer post. A post that arrives before the reading has first loaded schedules a fresh re-read, which starts after the post and so includes it.
 - **A reply can briefly be counted twice.** A re-read returns counts, not the replies behind them, so if its counts already include a reply whose event arrives afterwards, the event adds one more. That event also schedules a re-read, which corrects the count within about 300 ms plus a request. Making it exact would mean events carrying the server's counts, which isn't worth it for a blip that fixes itself.
+- **A quiet stream is replaced.** Every event, heartbeats included, shows the stream is alive. After 30 seconds with none, twice the heartbeat interval, the client closes the stream, reports that it is reconnecting and opens a new one, whose `ready` re-reads as usual. A stream closed for good is left closed until the user asks to reconnect.
 - **Problems show in the status area.** A dropped connection shows "Live updates paused. Reconnecting…", and a stream closed for good shows "Live updates stopped." with a Reconnect button. Both rank below "Can't reach the server", so a server outage shows one message. While connected, the discussion shows a quiet "Live updates on".
 - **New threads don't move what you're reading.** When the top of the thread list is out of view, a button counts other people's new threads and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as threads are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new thread's height.
 

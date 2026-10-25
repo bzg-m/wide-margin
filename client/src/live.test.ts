@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { EventName } from '../../shared/api.ts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventName, HEARTBEAT_INTERVAL_MS } from '../../shared/api.ts';
 import { connectToReading, type LiveHandlers } from './live.ts';
 
 /** Stands in for the browser's EventSource: tests send events and errors through it. */
@@ -30,6 +30,9 @@ class FakeEventSource extends EventTarget {
   }
 }
 
+// Longer than any reasonable silence limit.
+const A_MINUTE = 60_000;
+
 function connect() {
   const handlers: LiveHandlers = {
     onReady: vi.fn(),
@@ -38,15 +41,24 @@ function connect() {
     onReconnecting: vi.fn(),
     onStopped: vi.fn(),
   };
-  let source!: FakeEventSource;
+  const sources: FakeEventSource[] = [];
   const close = connectToReading('7', handlers, (url) => {
-    source = new FakeEventSource(url);
+    const source = new FakeEventSource(url);
+    sources.push(source);
     return source as unknown as EventSource;
   });
-  return { handlers, source, close };
+  return { handlers, sources, source: sources[0], close };
 }
 
 describe('connectToReading', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("passes the reading's new threads and replies to their handlers", () => {
     const { handlers, source } = connect();
 
@@ -68,11 +80,47 @@ describe('connectToReading', () => {
     expect(handlers.onStopped).toHaveBeenCalledTimes(1);
   });
 
-  it('closes the stream when asked', () => {
-    const { source, close } = connect();
+  it('replaces a stream that has gone quiet, and reports reconnecting', () => {
+    const { handlers, sources } = connect();
+    sources[0].send(EventName.Ready);
+
+    vi.advanceTimersByTime(A_MINUTE);
+
+    expect(sources[0].close).toHaveBeenCalled();
+    expect(handlers.onReconnecting).toHaveBeenCalled();
+    expect(sources[1]?.url).toBe(sources[0].url);
+  });
+
+  it('keeps a stream open while heartbeats arrive', () => {
+    const { handlers, sources } = connect();
+    sources[0].send(EventName.Ready);
+
+    for (let i = 0; i < 10; i++) {
+      vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS);
+      sources[0].send(EventName.Heartbeat);
+    }
+
+    expect(sources).toHaveLength(1);
+    expect(handlers.onReconnecting).not.toHaveBeenCalled();
+  });
+
+  it("doesn't reopen a stream that has stopped for good", () => {
+    const { handlers, sources } = connect();
+
+    sources[0].fail(sources[0].CLOSED);
+    vi.advanceTimersByTime(A_MINUTE);
+
+    expect(sources).toHaveLength(1);
+    expect(handlers.onReconnecting).not.toHaveBeenCalled();
+  });
+
+  it("closes the stream when asked, and doesn't reopen it", () => {
+    const { sources, close } = connect();
 
     close();
+    vi.advanceTimersByTime(A_MINUTE);
 
-    expect(source.close).toHaveBeenCalled();
+    expect(sources[0].close).toHaveBeenCalled();
+    expect(sources).toHaveLength(1);
   });
 });

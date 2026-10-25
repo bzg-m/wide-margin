@@ -59,10 +59,15 @@ export type ListAnnotationsResponse = { annotations: Annotation[]; nextPageToken
 /** One page of replies. */
 export type ListRepliesResponse = { replies: Reply[]; nextPageToken?: string };
 
+/** How often the server sends a heartbeat on a quiet event stream. */
+export const HEARTBEAT_INTERVAL_MS = 15_000;
+
 /** Names of the events sent on a reading's event stream. */
 export const EventName = {
   /** Sent once the stream is listening; anything posted afterwards will arrive. */
   Ready: 'ready',
+  /** Sent every HEARTBEAT_INTERVAL_MS, so the client can tell a quiet stream from a dead one. */
+  Heartbeat: 'heartbeat',
   AnnotationCreated: 'annotation.created',
   ReplyCreated: 'reply.created',
 } as const;

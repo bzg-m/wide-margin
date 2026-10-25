@@ -97,7 +97,7 @@ export async function openEventStream(request: TestRequest, user: User, readingI
   let buffer = '';
 
   // SSE events are blocks of "field: value" lines separated by a blank line.
-  // Lines starting with ":" are comments, such as heartbeats, and are skipped.
+  // Lines starting with ":" are comments, and are skipped.
   async function next(): Promise<TestEvent> {
     for (;;) {
       const end = buffer.indexOf('\n\n');

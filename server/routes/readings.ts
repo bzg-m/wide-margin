@@ -2,7 +2,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { streamSSE } from 'hono/streaming';
-import { EventName, type ListReadingsResponse, type Reading, type User } from '../../shared/api.ts';
+import {
+  EventName,
+  HEARTBEAT_INTERVAL_MS,
+  type ListReadingsResponse,
+  type Reading,
+  type User,
+} from '../../shared/api.ts';
 import { Action, can } from '../../shared/permissions.ts';
 import { createReadingBody } from '../../shared/schemas.ts';
 import { requirePermission, requireUser, type AppEnv } from '../auth.ts';
@@ -11,10 +17,6 @@ import { createReading, findReading, listReadings } from '../db/readings.ts';
 import type { ReadingEvents } from '../events.ts';
 import { paginate } from '../pagination.ts';
 import { jsonBody } from '../validation.ts';
-
-// Keeps idle connections from being closed by proxies, which often drop
-// connections that have sent nothing for 30 to 60 seconds.
-const HEARTBEAT_INTERVAL_MS = 25_000;
 
 /** Removes the fields this user isn't allowed to see. */
 function visibleTo(user: User, reading: Reading): Reading {
@@ -55,11 +57,12 @@ export function readingRoutes(db: DatabaseSync, events: ReadingEvents): Hono<App
       // Subscribed before this is sent, so a client that has seen `ready` misses nothing posted after.
       await stream.writeSSE({ event: EventName.Ready, data: '' });
 
+      // The heartbeat lets the client tell a quiet stream from a dead one, so it is a named event:
+      // EventSource never shows SSE comments to the page. It also keeps proxies, which often drop
+      // connections that have sent nothing for 30 to 60 seconds, from closing a quiet stream.
       while (!stream.aborted) {
         await stream.sleep(HEARTBEAT_INTERVAL_MS);
-        // A line starting with ":" is an SSE comment: it keeps the connection busy,
-        // and EventSource ignores it.
-        await stream.write(': heartbeat\n\n');
+        await stream.writeSSE({ event: EventName.Heartbeat, data: '' });
       }
     });
   });

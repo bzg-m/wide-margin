@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { EventName } from '../../shared/api.ts';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { EventName, HEARTBEAT_INTERVAL_MS } from '../../shared/api.ts';
 import { addPost, addReading, createTestApp, openEventStream } from '../test-app.ts';
 
 describe('reading event stream', () => {
@@ -36,6 +36,23 @@ describe('reading event stream', () => {
       name: EventName.ReplyCreated,
       data: { text: 'New reply', annotationId: thread.id },
     });
+    await stream.close();
+  });
+
+  it('sends a heartbeat event on a quiet stream', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const stream = await openEventStream(request, student, reading.id);
+
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+    await addPost(request, instructor, { readingId: reading.id });
+
+    // A heartbeat sent as an SSE comment would be skipped, and the post would arrive first.
+    expect((await stream.next()).name).toBe(EventName.Heartbeat);
     await stream.close();
   });
 

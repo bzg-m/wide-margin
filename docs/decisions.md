@@ -64,7 +64,7 @@ How it works end to end is in [realtime.md](realtime.md).
 - **Counts update at once, then the server's replace them.** A new post raises its thread's and reading's counts locally, and a re-read from the server about 300 ms later replaces them. A re-read is applied only if nothing changed after it started, and only if no later re-read has been applied, so an older response can't undo a newer post. If it fails, the local counts stay.
 - **Re-reading replaces replaying missed events,** which would need a stored event log. Open threads' replies are reloaded at the same time.
 - **Only new posts are published.** A retried create with the same `Idempotency-Key` publishes nothing.
-- **A heartbeat comment every 25 seconds** keeps proxies from closing a quiet stream.
+- **A heartbeat event every 15 seconds** keeps proxies from closing a quiet stream, and lets the client notice a dead one. The browser can't always tell that a connection has died, so after 30 seconds without any event the client replaces the stream. The heartbeat is a named event because `EventSource` never passes comments to the page.
 - **Concurrent posts never conflict.** Replies are all accepted and ordered by server time. If editing is added, ETags would prevent one edit from silently overwriting another.
 - **Known limits at scale:** several server instances would need a shared message channel; some proxies buffer responses and must be told not to; HTTP/1.1 allows a browser about 6 connections per site, which HTTP/2 lifts.
 
