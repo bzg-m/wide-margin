@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Reading, User } from '../../shared/api.ts';
-import { addPost, createTestApp, type TestRequest } from '../test-app.ts';
+import { addPost, addReading, createTestApp, type TestRequest } from '../test-app.ts';
 
 const validBody = { title: 'Chapter 1', description: 'Read the whole chapter.' };
 
@@ -93,12 +93,13 @@ describe('readings', () => {
   });
 
   it('counts threads and replies from students and instructors', async () => {
-    const { db, request, student, instructor } = createTestApp();
-    const reading: Reading = await (await postReading(request, instructor)).json();
-    const studentThread = addPost(db, { readingId: reading.id, authorId: student.id });
-    addPost(db, { readingId: reading.id, authorId: instructor.id });
-    addPost(db, { readingId: reading.id, authorId: student.id, threadId: studentThread });
-    addPost(db, { readingId: reading.id, authorId: instructor.id, threadId: studentThread });
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const studentThread = await addPost(request, student, { readingId: reading.id });
+    await addPost(request, instructor, { readingId: reading.id });
+    const inThread = { readingId: reading.id, annotationId: studentThread.id };
+    await addPost(request, student, inThread);
+    await addPost(request, instructor, inThread);
 
     const found = await (await request(student, `/v1/readings/${reading.id}`)).json();
 
@@ -106,11 +107,12 @@ describe('readings', () => {
   });
 
   it('counts each participating student once, and no instructors', async () => {
-    const { db, request, student, instructor } = createTestApp();
-    const reading: Reading = await (await postReading(request, instructor)).json();
-    const thread = addPost(db, { readingId: reading.id, authorId: student.id });
-    addPost(db, { readingId: reading.id, authorId: student.id, threadId: thread });
-    addPost(db, { readingId: reading.id, authorId: instructor.id, threadId: thread });
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const thread = await addPost(request, student, { readingId: reading.id });
+    const inThread = { readingId: reading.id, annotationId: thread.id };
+    await addPost(request, student, inThread);
+    await addPost(request, instructor, inThread);
 
     const found = await (await request(instructor, `/v1/readings/${reading.id}`)).json();
 
@@ -118,9 +120,9 @@ describe('readings', () => {
   });
 
   it('hides participation from students', async () => {
-    const { db, request, student, instructor } = createTestApp();
-    const reading: Reading = await (await postReading(request, instructor)).json();
-    addPost(db, { readingId: reading.id, authorId: student.id });
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    await addPost(request, student, { readingId: reading.id });
 
     const found = await (await request(student, `/v1/readings/${reading.id}`)).json();
 

@@ -72,6 +72,7 @@ export type NewReading = CreateReadingBody & {
  */
 export function createReading(db: DatabaseSync, input: NewReading): Reading | typeof KEY_REUSED {
   const creatorId = Number(input.creatorId);
+  // The same steps appear in createThread and createReply; see the note in posts.ts.
   // Node runs one request's code at a time, switching only at an `await`. These database
   // calls are synchronous, so no other request can run between this lookup and the insert.
   // (The UNIQUE constraint still blocks a duplicate if that ever changes.)

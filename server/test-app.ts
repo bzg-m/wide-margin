@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { Role, type User } from '../shared/api.ts';
+import { Role, type Annotation, type Reading, type Reply, type User } from '../shared/api.ts';
 import { createApp } from './app.ts';
 import { openDatabase } from './db/database.ts';
 
@@ -48,25 +48,30 @@ export function addUser(db: DatabaseSync, displayName: string, role: Role): User
   return { id: String(id), displayName, role };
 }
 
-/** Adds a thread to a reading, or a reply to `threadId`, directly to the database. Returns its ID. */
-export function addPost(
-  db: DatabaseSync,
-  { readingId, authorId, threadId }: { readingId: string; authorId: string; threadId?: number },
-): number {
-  const now = new Date().toISOString();
-  const row =
-    threadId === undefined
-      ? db
-          .prepare(
-            `INSERT INTO annotations (reading_id, author_id, text, created_at)
-             VALUES (?, ?, 'Thread', ?) RETURNING id`,
-          )
-          .get(Number(readingId), Number(authorId), now)
-      : db
-          .prepare(
-            `INSERT INTO replies (annotation_id, author_id, text, created_at)
-             VALUES (?, ?, 'Reply', ?) RETURNING id`,
-          )
-          .get(threadId, Number(authorId), now);
-  return (row as { id: number }).id;
+/** Creates a reading through the API as the given user, who must be allowed to. */
+export async function addReading(
+  request: TestRequest,
+  user: User,
+  body = { title: 'Chapter 1', description: 'Read the whole chapter.' },
+): Promise<Reading> {
+  const res = await request(user, '/v1/readings', { method: 'POST', body });
+  return res.json();
+}
+
+/** Posts a thread on a reading, or a reply to `annotationId`, through the API. Returns the created post. */
+export async function addPost(
+  request: TestRequest,
+  user: User,
+  {
+    readingId,
+    annotationId,
+    text = 'A post',
+  }: { readingId: string; annotationId?: string; text?: string },
+): Promise<Annotation | Reply> {
+  const path =
+    annotationId === undefined
+      ? `/v1/readings/${readingId}/annotations`
+      : `/v1/readings/${readingId}/annotations/${annotationId}/replies`;
+  const res = await request(user, path, { method: 'POST', body: { text } });
+  return res.json();
 }

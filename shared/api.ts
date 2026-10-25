@@ -26,3 +26,35 @@ export type ListUsersResponse = { users: User[]; nextPageToken?: string };
 
 /** One page of readings. */
 export type ListReadingsResponse = { readings: Reading[]; nextPageToken?: string };
+
+/** An annotation, which starts a thread on a reading, as returned by the API. */
+export type Annotation = {
+  id: string;
+  readingId: string;
+  authorId: string;
+  authorDisplayName: string;
+  authorRole: Role;
+  text: string;
+  createdAt: string;
+  replyCount: number;
+  /** When the newest reply was posted, or when the annotation was if it has no replies. */
+  lastActivityAt: string;
+};
+
+/** A reply to an annotation, as returned by the API. */
+export type Reply = {
+  id: string;
+  annotationId: string;
+  readingId: string;
+  authorId: string;
+  authorDisplayName: string;
+  authorRole: Role;
+  text: string;
+  createdAt: string;
+};
+
+/** One page of annotations. */
+export type ListAnnotationsResponse = { annotations: Annotation[]; nextPageToken?: string };
+
+/** One page of replies. */
+export type ListRepliesResponse = { replies: Reply[]; nextPageToken?: string };
