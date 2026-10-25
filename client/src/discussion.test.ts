@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Role, type Annotation, type Reading, type Reply } from '../../shared/api.ts';
 import {
+  AnnotationOrder,
+  applyAnnotation,
   applyReply,
-  applyThread,
   mergeReplies,
-  sortThreads,
-  ThreadOrder,
+  sortAnnotations,
   type DiscussionState,
 } from './discussion.ts';
 
@@ -15,18 +15,18 @@ const reading: Reading = {
   description: 'A description.',
   creatorId: '1',
   createdAt: '2026-10-01T00:00:00.000Z',
-  threadCount: 1,
+  annotationCount: 1,
   replyCount: 0,
   lastActivityAt: '2026-10-02T00:00:00.000Z',
 };
 
-const thread = (id: string, fields: Partial<Annotation> = {}): Annotation => ({
+const annotation = (id: string, fields: Partial<Annotation> = {}): Annotation => ({
   id,
   readingId: '1',
   authorId: '2',
   authorDisplayName: 'Sam',
   authorRole: Role.Student,
-  text: 'A thread',
+  text: 'An annotation',
   createdAt: '2026-10-02T00:00:00.000Z',
   replyCount: 0,
   lastActivityAt: '2026-10-02T00:00:00.000Z',
@@ -46,36 +46,36 @@ const reply = (id: string, createdAt = '2026-10-03T00:00:00.000Z'): Reply => ({
 
 const state = (fields: Partial<DiscussionState> = {}): DiscussionState => ({
   reading,
-  threads: [thread('10')],
+  annotations: [annotation('10')],
   replies: {},
   counted: new Set(),
   ...fields,
 });
 
-describe('applyThread and applyReply', () => {
+describe('applyAnnotation and applyReply', () => {
   it('counts a post once, even when it arrives twice', () => {
     const once = applyReply(state(), reply('5'));
     const twice = applyReply(once, reply('5'));
 
-    expect(twice.threads[0].replyCount).toBe(1);
+    expect(twice.annotations[0].replyCount).toBe(1);
     expect(twice.reading.replyCount).toBe(1);
   });
 
   it("doesn't count a post that a fetch already shows", () => {
-    const withThread = applyThread(state(), thread('10'));
+    const withAnnotation = applyAnnotation(state(), annotation('10'));
 
-    expect(withThread.threads).toHaveLength(1);
-    expect(withThread.reading.threadCount).toBe(1);
+    expect(withAnnotation.annotations).toHaveLength(1);
+    expect(withAnnotation.reading.annotationCount).toBe(1);
   });
 
-  it("moves the thread's and reading's last activity to the new post", () => {
+  it("moves the annotation's and reading's last activity to the new post", () => {
     const after = applyReply(state(), reply('5', '2026-10-04T00:00:00.000Z'));
 
-    expect(after.threads[0].lastActivityAt).toBe('2026-10-04T00:00:00.000Z');
+    expect(after.annotations[0].lastActivityAt).toBe('2026-10-04T00:00:00.000Z');
     expect(after.reading.lastActivityAt).toBe('2026-10-04T00:00:00.000Z');
   });
 
-  it('adds a reply to its thread only if the replies are loaded', () => {
+  it('adds a reply to its annotation only if the replies are loaded', () => {
     const closed = applyReply(state(), reply('5'));
     const open = applyReply(state({ replies: { '10': [] } }), reply('5'));
 
@@ -93,21 +93,23 @@ describe('mergeReplies', () => {
   });
 });
 
-describe('sortThreads', () => {
-  it('orders threads by when they were started, or by latest activity', () => {
-    const older = thread('1', {
+describe('sortAnnotations', () => {
+  it('orders annotations by when they were posted, or by latest activity', () => {
+    const older = annotation('1', {
       createdAt: '2026-10-01T00:00:00.000Z',
       lastActivityAt: '2026-10-09T00:00:00.000Z',
     });
-    const newer = thread('2', {
+    const newer = annotation('2', {
       createdAt: '2026-10-05T00:00:00.000Z',
       lastActivityAt: '2026-10-05T00:00:00.000Z',
     });
 
-    expect(sortThreads([older, newer], ThreadOrder.Newest).map((t) => t.id)).toEqual(['2', '1']);
-    expect(sortThreads([older, newer], ThreadOrder.RecentActivity).map((t) => t.id)).toEqual([
-      '1',
+    expect(sortAnnotations([older, newer], AnnotationOrder.Newest).map((t) => t.id)).toEqual([
       '2',
+      '1',
     ]);
+    expect(
+      sortAnnotations([older, newer], AnnotationOrder.RecentActivity).map((t) => t.id),
+    ).toEqual(['1', '2']);
   });
 });

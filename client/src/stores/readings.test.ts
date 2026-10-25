@@ -9,7 +9,7 @@ const reading = (id: string): Reading => ({
   description: 'A description.',
   creatorId: '1',
   createdAt: '2026-10-01T00:00:00.000Z',
-  threadCount: 0,
+  annotationCount: 0,
   replyCount: 0,
   lastActivityAt: null,
 });

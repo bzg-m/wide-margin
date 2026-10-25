@@ -4,10 +4,10 @@ import { Action, can } from '../../../shared/permissions.ts';
 import type { CreatePostBody } from '../../../shared/schemas.ts';
 import { ApiError, isServerUnreachable, isShownInStatusArea } from '../api/client.ts';
 import { countStudents } from '../api/index.ts';
+import AnnotationItem from '../components/AnnotationItem.vue';
 import PostComposer from '../components/PostComposer.vue';
 import ReadingDetails from '../components/ReadingDetails.vue';
-import ThreadItem from '../components/ThreadItem.vue';
-import { sortThreads, ThreadOrder } from '../discussion.ts';
+import { AnnotationOrder, sortAnnotations } from '../discussion.ts';
 import { RouteName } from '../navigation.ts';
 import { useDiscussion } from '../stores/discussion.ts';
 import { useSession } from '../stores/session.ts';
@@ -23,8 +23,8 @@ const canSeeParticipation = computed(
 );
 const studentCount = ref<number | null>(null);
 
-const order = ref<ThreadOrder>(ThreadOrder.Newest);
-const sortedThreads = computed(() => sortThreads(discussion.threads, order.value));
+const order = ref<AnnotationOrder>(AnnotationOrder.Newest);
+const sortedAnnotations = computed(() => sortAnnotations(discussion.annotations, order.value));
 
 const loading = ref(false);
 const notFound = ref(false);
@@ -73,7 +73,7 @@ async function loadStudentCount() {
 
 watch(() => props.readingId, load, { immediate: true });
 
-// Watches whether the top of the thread list is on screen, for the new-threads button.
+// Watches whether the top of the annotation list is on screen, for the new-annotations button.
 const listTop = useTemplateRef<HTMLElement>('list-top');
 let topObserver: IntersectionObserver | undefined;
 watch(listTop, (element) => {
@@ -85,7 +85,7 @@ watch(listTop, (element) => {
   topObserver.observe(element);
 });
 
-function showNewThreads() {
+function showNewAnnotations() {
   listTop.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -94,7 +94,7 @@ onUnmounted(() => {
   discussion.leave();
 });
 
-const sendThread = (body: CreatePostBody, key: string) => discussion.postThread(body, key);
+const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnnotation(body, key);
 </script>
 
 <template>
@@ -110,27 +110,27 @@ const sendThread = (body: CreatePostBody, key: string) => discussion.postThread(
       />
       <section class="discussion" aria-label="Discussion">
         <PostComposer
-          :key="`thread:${readingId}`"
-          :draft-key="`thread:${readingId}`"
-          label="Start a thread"
+          :key="`annotation:${readingId}`"
+          :draft-key="`annotation:${readingId}`"
+          label="Add an annotation"
           placeholder="Ask a question or share an observation"
-          :send="sendThread"
+          :send="sendAnnotation"
         />
         <div class="toolbar">
-          <template v-if="discussion.threads.length > 0">
+          <template v-if="discussion.annotations.length > 0">
             <span class="muted">Sort</span>
-            <div class="order" role="group" aria-label="Sort threads">
+            <div class="order" role="group" aria-label="Sort annotations">
               <button
                 type="button"
-                :aria-pressed="order === ThreadOrder.Newest"
-                @click="order = ThreadOrder.Newest"
+                :aria-pressed="order === AnnotationOrder.Newest"
+                @click="order = AnnotationOrder.Newest"
               >
                 Newest
               </button>
               <button
                 type="button"
-                :aria-pressed="order === ThreadOrder.RecentActivity"
-                @click="order = ThreadOrder.RecentActivity"
+                :aria-pressed="order === AnnotationOrder.RecentActivity"
+                @click="order = AnnotationOrder.RecentActivity"
               >
                 Recent activity
               </button>
@@ -140,19 +140,23 @@ const sendThread = (body: CreatePostBody, key: string) => discussion.postThread(
           <span v-if="discussion.live" class="live muted">Live updates on</span>
         </div>
         <button
-          v-if="discussion.unseenNewThreads > 0"
+          v-if="discussion.unseenNewAnnotations > 0"
           type="button"
-          class="new-threads"
-          @click="showNewThreads"
+          class="new-annotations"
+          @click="showNewAnnotations"
         >
-          {{ discussion.unseenNewThreads }} new
-          {{ discussion.unseenNewThreads === 1 ? 'thread' : 'threads' }} ↑
+          {{ discussion.unseenNewAnnotations }} new
+          {{ discussion.unseenNewAnnotations === 1 ? 'annotation' : 'annotations' }} ↑
         </button>
         <div ref="list-top" />
-        <p v-if="discussion.threads.length === 0" class="empty muted">
+        <p v-if="discussion.annotations.length === 0" class="empty muted">
           No annotations yet. Start the discussion with a question or an observation.
         </p>
-        <ThreadItem v-for="thread in sortedThreads" :key="thread.id" :thread="thread" />
+        <AnnotationItem
+          v-for="annotation in sortedAnnotations"
+          :key="annotation.id"
+          :annotation="annotation"
+        />
       </section>
     </div>
   </div>
@@ -233,7 +237,7 @@ const sendThread = (body: CreatePostBody, key: string) => discussion.postThread(
 }
 
 /* Stays at the top of the screen while scrolled down, until clicked or the top comes into view. */
-.new-threads {
+.new-annotations {
   position: sticky;
   top: var(--space-2);
   z-index: 1;

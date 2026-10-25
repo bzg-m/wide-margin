@@ -2,13 +2,13 @@ import { Role } from '../../shared/api.ts';
 
 type SeedUser = { key: string; displayName: string; role: Role };
 type SeedPost = { author: string; minutesAgo: number; text: string };
-type SeedThread = SeedPost & { replies: SeedPost[] };
+type SeedAnnotation = SeedPost & { replies: SeedPost[] };
 type SeedReading = {
   title: string;
   description: string;
   creator: string;
   minutesAgo: number;
-  threads: SeedThread[];
+  annotations: SeedAnnotation[];
 };
 
 const HOUR = 60;
@@ -32,7 +32,7 @@ export const users: SeedUser[] = [
   { key: 'kofi', displayName: 'Kofi Mensah', role: Role.Student },
 ];
 
-/** Sample readings with their threads and replies. Times are minutes before seeding. */
+/** Sample readings with their annotations and replies. Times are minutes before seeding. */
 export const readings: SeedReading[] = [
   {
     title: 'Supervised vs. unsupervised learning',
@@ -40,7 +40,7 @@ export const readings: SeedReading[] = [
       'Chapter 3 of the course text. Focus on how labeled data changes what a model can learn, and when you would choose each approach.',
     creator: 'lee',
     minutesAgo: 4 * DAY,
-    threads: [
+    annotations: [
       {
         author: 'michael',
         minutesAgo: 12,
@@ -121,7 +121,7 @@ export const readings: SeedReading[] = [
       'Vaswani et al., 2017. Read sections 1 to 3 and skim the rest. Come ready to explain self-attention in your own words.',
     creator: 'lee',
     minutesAgo: 9 * DAY,
-    threads: [
+    annotations: [
       {
         author: 'lena',
         minutesAgo: 3 * DAY,
@@ -170,7 +170,7 @@ export const readings: SeedReading[] = [
       'Clark and Chalmers, 1998. Is a notebook part of someone’s mind? Read the whole paper and note where you disagree.',
     creator: 'ortiz',
     minutesAgo: 20 * DAY,
-    threads: [
+    annotations: [
       {
         author: 'omar',
         minutesAgo: 15 * DAY,
@@ -213,6 +213,6 @@ export const readings: SeedReading[] = [
       'A short case study on using software to grade student essays. Read it before Monday and think about who should be accountable for a grade.',
     creator: 'ortiz',
     minutesAgo: 30,
-    threads: [],
+    annotations: [],
   },
 ];

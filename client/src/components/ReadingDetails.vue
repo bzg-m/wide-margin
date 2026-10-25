@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Reading } from '../../../shared/api.ts';
+import { countOf } from '../format.ts';
 import { RouteName } from '../navigation.ts';
+import { postCount } from '../readings.ts';
 
 /** A reading's title, description and counts, shown beside its discussion. */
 const props = defineProps<{
@@ -17,7 +19,6 @@ const LONG_DESCRIPTION = 240;
 const expanded = ref(false);
 const isLong = computed(() => props.reading.description.length > LONG_DESCRIPTION);
 
-const annotations = computed(() => props.reading.threadCount + props.reading.replyCount);
 const participation = computed(() => {
   const count = props.reading.participatingStudentCount ?? 0;
   const of = props.studentCount === null ? '' : ` of ${props.studentCount}`;
@@ -35,8 +36,11 @@ const participation = computed(() => {
     </button>
     <dl class="counts">
       <div>
-        <dt>{{ annotations }} annotations</dt>
-        <dd class="muted">{{ reading.threadCount }} threads · {{ reading.replyCount }} replies</dd>
+        <dt>{{ countOf(reading.annotationCount, 'annotation', 'annotations') }}</dt>
+        <dd class="muted">
+          {{ countOf(reading.replyCount, 'reply', 'replies') }} ·
+          {{ countOf(postCount(reading), 'post', 'posts') }}
+        </dd>
       </div>
       <div v-if="showParticipation">
         <dt>{{ participation }}</dt>

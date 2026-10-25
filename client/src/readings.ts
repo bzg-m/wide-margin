@@ -17,14 +17,14 @@ export type Sort = { key: SortKey; descending: boolean };
 /** Newest first by creation date, unless the user picks otherwise. */
 export const defaultSort: Sort = { key: SortKey.Created, descending: true };
 
-/** Total annotations on a reading: threads plus replies. */
-export function annotationCount(reading: Reading): number {
-  return reading.threadCount + reading.replyCount;
+/** All posts on a reading: its annotations and their replies. */
+export function postCount(reading: Reading): number {
+  return reading.annotationCount + reading.replyCount;
 }
 
 const valueOf: Record<SortKey, (reading: Reading) => string | number | null> = {
   [SortKey.Title]: (r) => r.title,
-  [SortKey.Annotations]: annotationCount,
+  [SortKey.Annotations]: (r) => r.annotationCount,
   [SortKey.Students]: (r) => r.participatingStudentCount ?? 0,
   [SortKey.Created]: (r) => r.createdAt,
   [SortKey.LastActivity]: (r) => r.lastActivityAt,

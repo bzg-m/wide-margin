@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS readings (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS readings_by_created ON readings (created_at, id);
 
--- An annotation starts a thread on a reading.
+-- An annotation is a post on a reading. It can have replies.
 CREATE TABLE IF NOT EXISTS annotations (
   id              INTEGER PRIMARY KEY,
   reading_id      INTEGER NOT NULL REFERENCES readings (id),
@@ -41,9 +41,11 @@ CREATE TABLE IF NOT EXISTS replies (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS replies_by_annotation ON replies (annotation_id, created_at, id);
 
--- Every post on a reading, threads and replies alike. Counts are computed from this view.
-CREATE VIEW IF NOT EXISTS posts AS
-  SELECT reading_id, author_id, created_at, 'thread' AS kind FROM annotations
+-- Every post on a reading, annotations and replies alike. Counts are computed from this view.
+-- A view holds no data, so it is rebuilt at every start and always matches this definition.
+DROP VIEW IF EXISTS posts;
+CREATE VIEW posts AS
+  SELECT reading_id, author_id, created_at, 'annotation' AS kind FROM annotations
   UNION ALL
   SELECT a.reading_id, r.author_id, r.created_at, 'reply' AS kind
   FROM replies r JOIN annotations a ON a.id = r.annotation_id;

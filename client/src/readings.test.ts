@@ -8,7 +8,7 @@ function reading(fields: Partial<Reading> & { id: string }): Reading {
     description: 'A description.',
     creatorId: '1',
     createdAt: '2026-10-01T00:00:00.000Z',
-    threadCount: 0,
+    annotationCount: 0,
     replyCount: 0,
     lastActivityAt: null,
     ...fields,
@@ -55,16 +55,16 @@ describe('sortReadings', () => {
     expect(ids(oldest)).toEqual(['early', 'late', 'quiet']);
   });
 
-  it('sorts by total annotations, threads plus replies', () => {
-    const manyThreads = reading({ id: 'threads', threadCount: 4, replyCount: 0 });
-    const manyReplies = reading({ id: 'replies', threadCount: 1, replyCount: 6 });
+  it('sorts by annotations, not replies', () => {
+    const manyAnnotations = reading({ id: 'annotations', annotationCount: 4, replyCount: 0 });
+    const manyReplies = reading({ id: 'replies', annotationCount: 1, replyCount: 6 });
 
-    const sorted = sortReadings([manyThreads, manyReplies], {
+    const sorted = sortReadings([manyAnnotations, manyReplies], {
       key: SortKey.Annotations,
       descending: true,
     });
 
-    expect(ids(sorted)).toEqual(['replies', 'threads']);
+    expect(ids(sorted)).toEqual(['annotations', 'replies']);
   });
 });
 

@@ -36,7 +36,7 @@ const A_MINUTE = 60_000;
 function connect() {
   const handlers: LiveHandlers = {
     onReady: vi.fn(),
-    onThread: vi.fn(),
+    onAnnotation: vi.fn(),
     onReply: vi.fn(),
     onReconnecting: vi.fn(),
     onStopped: vi.fn(),
@@ -59,14 +59,14 @@ describe('connectToReading', () => {
     vi.useRealTimers();
   });
 
-  it("passes the reading's new threads and replies to their handlers", () => {
+  it("passes the reading's new annotations and replies to their handlers", () => {
     const { handlers, source } = connect();
 
-    source.send(EventName.AnnotationCreated, { id: '1', text: 'A thread' });
+    source.send(EventName.AnnotationCreated, { id: '1', text: 'An annotation' });
     source.send(EventName.ReplyCreated, { id: '2', text: 'A reply' });
 
     expect(source.url).toBe('/v1/readings/7/events');
-    expect(handlers.onThread).toHaveBeenCalledWith({ id: '1', text: 'A thread' });
+    expect(handlers.onAnnotation).toHaveBeenCalledWith({ id: '1', text: 'An annotation' });
     expect(handlers.onReply).toHaveBeenCalledWith({ id: '2', text: 'A reply' });
   });
 

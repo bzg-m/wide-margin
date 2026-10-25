@@ -4,7 +4,7 @@ import type { CreatePostBody } from '../../shared/schemas.ts';
 import { KEY_REUSED, type CreateResult } from './idempotency.ts';
 import { parseId } from './ids.ts';
 
-const SELECT_THREADS = `
+const SELECT_ANNOTATIONS = `
   SELECT a.id, a.reading_id, a.author_id, u.display_name AS author_display_name,
     u.role AS author_role, a.text, a.created_at,
     COUNT(r.id) AS reply_count,
@@ -20,7 +20,7 @@ const SELECT_REPLIES = `
   JOIN annotations a ON a.id = r.annotation_id
   JOIN users u ON u.id = r.author_id`;
 
-type ThreadRow = {
+type AnnotationRow = {
   id: number;
   reading_id: number;
   author_id: number;
@@ -32,9 +32,9 @@ type ThreadRow = {
   last_activity_at: string;
 };
 
-type ReplyRow = Omit<ThreadRow, 'reply_count' | 'last_activity_at'> & { annotation_id: number };
+type ReplyRow = Omit<AnnotationRow, 'reply_count' | 'last_activity_at'> & { annotation_id: number };
 
-function toAnnotation(row: ThreadRow): Annotation {
+function toAnnotation(row: AnnotationRow): Annotation {
   return {
     id: String(row.id),
     readingId: String(row.reading_id),
@@ -61,8 +61,8 @@ function toReply(row: ReplyRow): Reply {
   };
 }
 
-/** Lists a reading's threads newest first, one page at a time. */
-export function listThreads(
+/** Lists a reading's annotations newest first, one page at a time. */
+export function listAnnotations(
   db: DatabaseSync,
   readingId: string,
   offset: number,
@@ -70,19 +70,19 @@ export function listThreads(
 ): Annotation[] {
   const rows = db
     .prepare(
-      `${SELECT_THREADS} WHERE a.reading_id = ? GROUP BY a.id
+      `${SELECT_ANNOTATIONS} WHERE a.reading_id = ? GROUP BY a.id
        ORDER BY a.created_at DESC, a.id DESC LIMIT ? OFFSET ?`,
     )
-    .all(Number(readingId), limit, offset) as ThreadRow[];
+    .all(Number(readingId), limit, offset) as AnnotationRow[];
   return rows.map(toAnnotation);
 }
 
-/** Finds a thread's annotation by API ID, or returns undefined if there is none. */
-export function findThread(db: DatabaseSync, id: string): Annotation | undefined {
+/** Finds an annotation by API ID, or returns undefined if there is none. */
+export function findAnnotation(db: DatabaseSync, id: string): Annotation | undefined {
   const rowId = parseId(id);
   if (rowId === undefined) return undefined;
-  const row = db.prepare(`${SELECT_THREADS} WHERE a.id = ? GROUP BY a.id`).get(rowId);
-  return row ? toAnnotation(row as ThreadRow) : undefined;
+  const row = db.prepare(`${SELECT_ANNOTATIONS} WHERE a.id = ? GROUP BY a.id`).get(rowId);
+  return row ? toAnnotation(row as AnnotationRow) : undefined;
 }
 
 /** Lists an annotation's replies oldest first, one page at a time. */
@@ -112,16 +112,16 @@ export type NewPost = CreatePostBody & {
   idempotencyKey?: string;
 };
 
-// NOTE: createReading, createThread and createReply repeat the same idempotency steps (look up
+// NOTE: createReading, createAnnotation and createReply repeat the same idempotency steps (look up
 // the key, compare content, then insert) against different tables. They're kept separate because
 // each copy is short and readable top to bottom; a shared helper would need table and column
 // names passed in as strings. Revisit if a fourth create needs the same steps.
 
 /**
- * Starts a thread, or returns the one started earlier with the same idempotency key.
+ * Posts an annotation, or returns the one posted earlier with the same idempotency key.
  * Returns `KEY_REUSED` if that key was used for different text or another reading.
  */
-export function createThread(
+export function createAnnotation(
   db: DatabaseSync,
   readingId: string,
   input: NewPost,
@@ -137,7 +137,9 @@ export function createThread(
       { id: number; reading_id: number; text: string } | undefined;
     if (earlier) {
       const same = earlier.reading_id === Number(readingId) && earlier.text === input.text;
-      return same ? { resource: findThread(db, String(earlier.id))!, isNew: false } : KEY_REUSED;
+      return same
+        ? { resource: findAnnotation(db, String(earlier.id))!, isNew: false }
+        : KEY_REUSED;
     }
   }
   const { id } = db
@@ -152,7 +154,7 @@ export function createThread(
       input.createdAt,
       input.idempotencyKey ?? null,
     ) as { id: number };
-  return { resource: findThread(db, String(id))!, isNew: true };
+  return { resource: findAnnotation(db, String(id))!, isNew: true };
 }
 
 /**

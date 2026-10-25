@@ -1,6 +1,6 @@
 # Live updates
 
-New threads and replies appear for everyone viewing a reading without a page refresh. This page explains how, from the wire format to what the browser does with each event.
+New annotations and replies appear for everyone viewing a reading without a page refresh. This page explains how, from the wire format to what the browser does with each event.
 
 ## Server-Sent Events
 
@@ -32,15 +32,15 @@ Each reading has its own stream at `GET /v1/readings/:readingId/events` ([server
 | -------------------- | -------------------- | ---------------------------------------------------------------- |
 | `ready`              | none                 | The stream is listening. Anything posted after this arrives.     |
 | `heartbeat`          | none                 | Every 15 seconds, so a quiet stream can be told from a dead one. |
-| `annotation.created` | the new `Annotation` | Someone starts a thread on the reading.                          |
-| `reply.created`      | the new `Reply`      | Someone replies in one of the reading's threads.                 |
+| `annotation.created` | the new `Annotation` | Someone posts an annotation on the reading.                      |
+| `reply.created`      | the new `Reply`      | Someone replies to one of the reading's annotations.             |
 
 The stream requires a signed-in user like the rest of the API. The browser's `EventSource` sends the sign-in cookie, because the page and the API share one origin.
 
 ## How one post reaches every viewer
 
 ```
-POST …/annotations ──► createThread ──► events.publish(readingId, event)
+POST …/annotations ──► createAnnotation ──► events.publish(readingId, event)
                                               │
                          ┌────────────────────┼────────────────────┐
                          ▼                    ▼                    ▼
@@ -50,7 +50,7 @@ POST …/annotations ──► createThread ──► events.publish(readingId, 
 `ReadingEvents` ([server/events.ts](../server/events.ts)) keeps a list of listeners for each reading:
 
 1. When a stream opens, it **subscribes** a listener for its reading. The listener writes each event it receives into that stream's response.
-2. When a thread or reply is created, the route **publishes** an event for the reading ([server/routes/annotations.ts](../server/routes/annotations.ts)). Every listener for that reading gets it.
+2. When an annotation or reply is created, the route **publishes** an event for the reading ([server/routes/annotations.ts](../server/routes/annotations.ts)). Every listener for that reading gets it.
 3. A retried create with the same `Idempotency-Key` publishes nothing, because the post isn't new.
 
 Publishing doesn't wait for each write to finish, so a slow connection doesn't hold up the others or the request that made the post.
@@ -75,14 +75,14 @@ The browser can't always tell that a connection has died. A network can drop wit
 
 The client's side lives in [client/src/live.ts](../client/src/live.ts), which wraps `EventSource`, and the discussion store, [client/src/stores/discussion.ts](../client/src/stores/discussion.ts). It follows these rules:
 
-- **Every `ready` means re-read.** The page loads the reading straight away, so it appears quickly, and opens the stream alongside. Each `ready`, on the first connection and after every reconnect, re-reads the reading and its threads and reloads the replies of any open thread. Anything posted before the stream was listening, or while it was disconnected, arrives that way. Events carry no IDs, so the server can't replay what was missed; re-reading is simpler and always correct.
+- **Every `ready` means re-read.** The page loads the reading straight away, so it appears quickly, and opens the stream alongside. Each `ready`, on the first connection and after every reconnect, re-reads the reading and its annotations and reloads the replies of any open annotation. Anything posted before the stream was listening, or while it was disconnected, arrives that way. Events carry no IDs, so the server can't replay what was missed; re-reading is simpler and always correct.
 - **Each post is counted once, by ID.** The author's own post arrives twice, once in the create response and once on the stream. The second copy changes nothing.
-- **Counts update at once, then the server's replace them.** A new post, from the stream or your own, raises its thread's and reading's counts and moves their last activity. About 300 ms later, a re-read from the server replaces them.
+- **Counts update at once, then the server's replace them.** A new post, from the stream or your own, raises its annotation's and reading's counts and moves their last activity. About 300 ms later, a re-read from the server replaces them.
 - **Only an up-to-date re-read is applied.** A re-read that started before a later change, or before another re-read that has already been applied, is ignored. An older response can therefore never undo a newer post. A post that arrives before the reading has first loaded schedules a fresh re-read, which starts after the post and so includes it.
 - **A reply can briefly be counted twice.** A re-read returns counts, not the replies behind them, so if its counts already include a reply whose event arrives afterwards, the event adds one more. That event also schedules a re-read, which corrects the count within about 300 ms plus a request. Making it exact would mean events carrying the server's counts, which isn't worth it for a blip that fixes itself.
 - **A quiet stream is replaced.** Every event, heartbeats included, shows the stream is alive. After 30 seconds with none, twice the heartbeat interval, the client closes the stream, reports that it is reconnecting and opens a new one, whose `ready` re-reads as usual. A stream closed for good is left closed until the user asks to reconnect.
 - **Problems show in the status area.** A dropped connection shows "Live updates paused. Reconnecting…", and a stream closed for good shows "Live updates stopped." with a Reconnect button. Both rank below "Can't reach the server", so a server outage shows one message. While connected, the discussion shows a quiet "Live updates on".
-- **New threads don't move what you're reading.** When the top of the thread list is out of view, a button counts other people's new threads and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as threads are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new thread's height.
+- **New annotations don't move what you're reading.** When the top of the annotation list is out of view, a button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new annotation's height.
 
 ## Limits at scale
 

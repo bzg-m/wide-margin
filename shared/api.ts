@@ -13,7 +13,7 @@ export type Reading = {
   description: string;
   creatorId: string;
   createdAt: string;
-  threadCount: number;
+  annotationCount: number;
   replyCount: number;
   /** Distinct students who have posted. Present only for users allowed to view participation. */
   participatingStudentCount?: number;
@@ -27,7 +27,7 @@ export type ListUsersResponse = { users: User[]; nextPageToken?: string };
 /** One page of readings. */
 export type ListReadingsResponse = { readings: Reading[]; nextPageToken?: string };
 
-/** An annotation, which starts a thread on a reading, as returned by the API. */
+/** An annotation, a post on a reading, as returned by the API. */
 export type Annotation = {
   id: string;
   readingId: string;

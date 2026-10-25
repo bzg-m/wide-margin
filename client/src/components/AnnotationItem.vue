@@ -9,8 +9,8 @@ import { useDiscussion } from '../stores/discussion.ts';
 import PostComposer from './PostComposer.vue';
 import PostContent from './PostContent.vue';
 
-/** One thread: its annotation, and when opened, its replies (oldest first) and a reply box. */
-const props = defineProps<{ thread: Annotation }>();
+/** One annotation and, when opened, its replies (oldest first) and a reply box. */
+const props = defineProps<{ annotation: Annotation }>();
 
 const discussion = useDiscussion();
 const now = useNow();
@@ -18,12 +18,12 @@ const open = ref(false);
 const loading = ref(false);
 const loadError = ref('');
 
-const replies = computed(() => discussion.replies[props.thread.id]);
-const repliesId = computed(() => `replies-${props.thread.id}`);
+const replies = computed(() => discussion.replies[props.annotation.id]);
+const repliesId = computed(() => `replies-${props.annotation.id}`);
 const toggleLabel = computed(() => {
-  const count = props.thread.replyCount;
+  const count = props.annotation.replyCount;
   if (count === 0) return 'Reply';
-  const last = relativeTime(props.thread.lastActivityAt, now.value);
+  const last = relativeTime(props.annotation.lastActivityAt, now.value);
   return `${count} ${count === 1 ? 'reply' : 'replies'} · last ${last}`;
 });
 
@@ -31,7 +31,7 @@ async function loadReplies() {
   loading.value = true;
   loadError.value = '';
   try {
-    await discussion.loadReplies(props.thread.id);
+    await discussion.loadReplies(props.annotation.id);
   } catch (error) {
     if (isServerUnreachable(error)) {
       loadError.value = 'Replies will load once the server is reachable.';
@@ -49,16 +49,16 @@ function toggle() {
 }
 
 const sendReply = (body: CreatePostBody, key: string) =>
-  discussion.postReply(props.thread.id, body, key);
+  discussion.postReply(props.annotation.id, body, key);
 </script>
 
 <template>
-  <article class="thread">
+  <article class="annotation">
     <PostContent
-      :author-display-name="thread.authorDisplayName"
-      :author-role="thread.authorRole"
-      :created-at="thread.createdAt"
-      :text="thread.text"
+      :author-display-name="annotation.authorDisplayName"
+      :author-role="annotation.authorRole"
+      :created-at="annotation.createdAt"
+      :text="annotation.text"
     />
     <button
       type="button"
@@ -86,9 +86,9 @@ const sendReply = (body: CreatePostBody, key: string) =>
         </li>
       </ol>
       <PostComposer
-        :draft-key="`reply:${thread.id}`"
-        :label="`Reply to ${thread.authorDisplayName}`"
-        :placeholder="`Reply to ${thread.authorDisplayName}`"
+        :draft-key="`reply:${annotation.id}`"
+        :label="`Reply to ${annotation.authorDisplayName}`"
+        :placeholder="`Reply to ${annotation.authorDisplayName}`"
         :send="sendReply"
       />
     </div>
@@ -96,7 +96,7 @@ const sendReply = (body: CreatePostBody, key: string) =>
 </template>
 
 <style scoped>
-.thread {
+.annotation {
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }

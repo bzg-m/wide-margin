@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Reading } from '../../../shared/api.ts';
-import { exactTime, relativeTime } from '../format.ts';
+import { countOf, exactTime, relativeTime } from '../format.ts';
 import { useNow } from '../now.ts';
 import { RouteName } from '../navigation.ts';
-import { annotationCount, SortKey, type Sort } from '../readings.ts';
+import { postCount, SortKey, type Sort } from '../readings.ts';
 
 /** The readings as a table with sortable column headers. In a narrow container, each row becomes a card. */
 const props = defineProps<{
@@ -69,9 +69,10 @@ function participation(reading: Reading) {
           <span class="description muted">{{ reading.description }}</span>
         </td>
         <td data-label="Annotations">
-          {{ annotationCount(reading) }}
+          {{ reading.annotationCount }}
           <span class="split muted">
-            {{ reading.threadCount }} threads · {{ reading.replyCount }} replies
+            {{ countOf(reading.replyCount, 'reply', 'replies') }} ·
+            {{ countOf(postCount(reading), 'post', 'posts') }}
           </span>
         </td>
         <td v-if="showParticipation" data-label="Students">{{ participation(reading) }}</td>

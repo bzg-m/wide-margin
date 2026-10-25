@@ -22,12 +22,12 @@ const reading = (replyCount: number): Reading => ({
   description: 'A description.',
   creatorId: '1',
   createdAt: '2026-10-01T00:00:00.000Z',
-  threadCount: 1,
+  annotationCount: 1,
   replyCount,
   lastActivityAt: '2026-10-02T00:00:00.000Z',
 });
 
-const thread = (replyCount: number, text = 'A thread'): Annotation => ({
+const annotation = (replyCount: number, text = 'An annotation'): Annotation => ({
   id: '10',
   readingId: '1',
   authorId: '2',
@@ -39,8 +39,8 @@ const thread = (replyCount: number, text = 'A thread'): Annotation => ({
   lastActivityAt: '2026-10-02T00:00:00.000Z',
 });
 
-const newThread = (id: string, authorId: string): Annotation => ({
-  ...thread(0),
+const newAnnotation = (id: string, authorId: string): Annotation => ({
+  ...annotation(0),
   id,
   authorId,
   createdAt: '2026-10-05T00:00:00.000Z',
@@ -77,7 +77,7 @@ describe('discussion store', () => {
       return vi.fn();
     });
     vi.mocked(api.getReading).mockResolvedValue(reading(0));
-    vi.mocked(api.listAnnotations).mockResolvedValue([thread(0)]);
+    vi.mocked(api.listAnnotations).mockResolvedValue([annotation(0)]);
     vi.mocked(api.listReplies).mockResolvedValue([]);
     vi.mocked(api.createReply).mockImplementation(async (_r, _a, body) => reply(body.text));
     await useDiscussion().show('1');
@@ -91,48 +91,48 @@ describe('discussion store', () => {
   describe('re-reads', () => {
     it('ignores a re-read that started before a later change', async () => {
       const discussion = useDiscussion();
-      const staleThreads = deferred<Annotation[]>();
+      const staleAnnotations = deferred<Annotation[]>();
       await discussion.postReply('10', { text: '5' }, 'key-5');
-      vi.mocked(api.listAnnotations).mockReturnValueOnce(staleThreads.promise);
+      vi.mocked(api.listAnnotations).mockReturnValueOnce(staleAnnotations.promise);
       await vi.advanceTimersByTimeAsync(300); // The first re-read starts and waits.
 
       await discussion.postReply('10', { text: '6' }, 'key-6');
-      staleThreads.resolve([thread(1)]); // Started before reply 6, so it only knows of one reply.
+      staleAnnotations.resolve([annotation(1)]); // Started before reply 6, so it only knows of one reply.
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(discussion.threads[0].replyCount).toBe(2);
+      expect(discussion.annotations[0].replyCount).toBe(2);
     });
 
     it('ignores a re-read that finishes after a later one has been applied', async () => {
       const discussion = useDiscussion();
-      const slowThreads = deferred<Annotation[]>();
+      const slowAnnotations = deferred<Annotation[]>();
       vi.mocked(api.listAnnotations)
-        .mockReturnValueOnce(slowThreads.promise)
-        .mockResolvedValueOnce([thread(2, 'Newer')]);
+        .mockReturnValueOnce(slowAnnotations.promise)
+        .mockResolvedValueOnce([annotation(2, 'Newer')]);
 
       live.onReady(); // Starts a re-read that waits.
       live.onReady(); // Starts a later re-read, which finishes first.
       await vi.advanceTimersByTimeAsync(0);
-      slowThreads.resolve([thread(1, 'Older')]);
+      slowAnnotations.resolve([annotation(1, 'Older')]);
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(discussion.threads[0].text).toBe('Newer');
+      expect(discussion.annotations[0].text).toBe('Newer');
     });
 
     it('replaces the counts with a re-read that started after every change', async () => {
       const discussion = useDiscussion();
       await discussion.postReply('10', { text: '5' }, 'key-5');
-      vi.mocked(api.listAnnotations).mockResolvedValueOnce([thread(1, 'From the server')]);
+      vi.mocked(api.listAnnotations).mockResolvedValueOnce([annotation(1, 'From the server')]);
       vi.mocked(api.getReading).mockResolvedValueOnce(reading(1));
 
       await vi.advanceTimersByTimeAsync(300);
 
-      expect(discussion.threads[0].text).toBe('From the server');
+      expect(discussion.annotations[0].text).toBe('From the server');
     });
   });
 
   describe('live updates', () => {
-    it("re-reads, and reloads open threads' replies, on every ready", async () => {
+    it("re-reads, and reloads open annotations' replies, on every ready", async () => {
       const discussion = useDiscussion();
       await discussion.loadReplies('10');
       vi.clearAllMocks();
@@ -149,15 +149,15 @@ describe('discussion store', () => {
       const firstLoad = deferred<Annotation[]>();
       vi.mocked(api.listAnnotations)
         .mockReturnValueOnce(firstLoad.promise)
-        .mockResolvedValueOnce([newThread('11', '2'), thread(0)]);
+        .mockResolvedValueOnce([newAnnotation('11', '2'), annotation(0)]);
 
       const showing = discussion.show('1');
-      live.onThread(newThread('11', '2'));
-      firstLoad.resolve([thread(0)]); // Started before thread 11 was saved.
+      live.onAnnotation(newAnnotation('11', '2'));
+      firstLoad.resolve([annotation(0)]); // Started before annotation 11 was saved.
       await showing;
       await vi.advanceTimersByTimeAsync(300);
 
-      expect(discussion.threads.map((t) => t.id)).toContain('11');
+      expect(discussion.annotations.map((t) => t.id)).toContain('11');
     });
 
     it('applies a post from the stream once, even if its create response already did', async () => {
@@ -166,20 +166,20 @@ describe('discussion store', () => {
 
       live.onReply(reply('5'));
 
-      expect(discussion.threads[0].replyCount).toBe(1);
+      expect(discussion.annotations[0].replyCount).toBe(1);
     });
 
-    it("counts other people's new threads while the top is out of view, and resets when it's back", () => {
+    it("counts other people's new annotations while the top is out of view, and resets when it's back", () => {
       const discussion = useDiscussion();
       discussion.setTopInView(false);
 
-      live.onThread(newThread('11', '2'));
-      live.onThread(newThread('12', '3')); // Sarah's own thread isn't news to her.
-      const whileScrolled = discussion.unseenNewThreads;
+      live.onAnnotation(newAnnotation('11', '2'));
+      live.onAnnotation(newAnnotation('12', '3')); // Sarah's own annotation isn't news to her.
+      const whileScrolled = discussion.unseenNewAnnotations;
       discussion.setTopInView(true);
 
       expect(whileScrolled).toBe(1);
-      expect(discussion.unseenNewThreads).toBe(0);
+      expect(discussion.unseenNewAnnotations).toBe(0);
     });
   });
 });

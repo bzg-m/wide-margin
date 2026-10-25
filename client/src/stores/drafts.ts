@@ -7,7 +7,7 @@ import { useSession } from './session.ts';
 export type Draft = { fields: Record<string, string>; lastAttempt?: Attempt<unknown> };
 
 /**
- * Unsent drafts by form, such as "thread:3", "reply:17" or "reading:new". They're kept while the
+ * Unsent drafts by form, such as "annotation:3", "reply:17" or "reading:new". They're kept while the
  * page is open, so leaving a page (for example, to sign in again) and coming back keeps the text.
  * Each user has their own drafts.
  */

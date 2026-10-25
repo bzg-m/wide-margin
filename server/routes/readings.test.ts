@@ -31,7 +31,7 @@ describe('readings', () => {
     expect(reading).toMatchObject({
       ...validBody,
       creatorId: instructor.id,
-      threadCount: 0,
+      annotationCount: 0,
       replyCount: 0,
       participatingStudentCount: 0,
       lastActivityAt: null,
@@ -92,27 +92,27 @@ describe('readings', () => {
     expect(res.status).toBe(422);
   });
 
-  it('counts threads and replies from students and instructors', async () => {
+  it('counts annotations and replies from students and instructors', async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
-    const studentThread = await addPost(request, student, { readingId: reading.id });
+    const studentAnnotation = await addPost(request, student, { readingId: reading.id });
     await addPost(request, instructor, { readingId: reading.id });
-    const inThread = { readingId: reading.id, annotationId: studentThread.id };
-    await addPost(request, student, inThread);
-    await addPost(request, instructor, inThread);
+    const asReply = { readingId: reading.id, annotationId: studentAnnotation.id };
+    await addPost(request, student, asReply);
+    await addPost(request, instructor, asReply);
 
     const found = await (await request(student, `/v1/readings/${reading.id}`)).json();
 
-    expect(found).toMatchObject({ threadCount: 2, replyCount: 2 });
+    expect(found).toMatchObject({ annotationCount: 2, replyCount: 2 });
   });
 
   it('counts each participating student once, and no instructors', async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
-    const thread = await addPost(request, student, { readingId: reading.id });
-    const inThread = { readingId: reading.id, annotationId: thread.id };
-    await addPost(request, student, inThread);
-    await addPost(request, instructor, inThread);
+    const annotation = await addPost(request, student, { readingId: reading.id });
+    const asReply = { readingId: reading.id, annotationId: annotation.id };
+    await addPost(request, student, asReply);
+    await addPost(request, instructor, asReply);
 
     const found = await (await request(instructor, `/v1/readings/${reading.id}`)).json();
 

@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Annotation, Reply } from '../../shared/api.ts';
 import { addPost, addReading, createTestApp } from '../test-app.ts';
 
-const threadsPath = (readingId: string) => `/v1/readings/${readingId}/annotations`;
+const annotationsPath = (readingId: string) => `/v1/readings/${readingId}/annotations`;
 const repliesPath = (readingId: string, annotationId: string) =>
   `/v1/readings/${readingId}/annotations/${annotationId}/replies`;
 
 describe('annotations and replies', () => {
-  it('lets a signed-in user start a thread, shown with its author', async () => {
+  it('lets a signed-in user post an annotation, shown with its author', async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
 
-    const res = await request(student, threadsPath(reading.id), {
+    const res = await request(student, annotationsPath(reading.id), {
       method: 'POST',
       body: { text: 'Why does this work?' },
     });
@@ -27,14 +27,14 @@ describe('annotations and replies', () => {
     });
   });
 
-  it('lists threads newest first', async () => {
+  it('lists annotations newest first', async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
     for (const text of ['First', 'Second', 'Third']) {
       await addPost(request, student, { readingId: reading.id, text });
     }
 
-    const { annotations } = await (await request(student, threadsPath(reading.id))).json();
+    const { annotations } = await (await request(student, annotationsPath(reading.id))).json();
 
     expect(annotations.map((a: Annotation) => a.text)).toEqual(['Third', 'Second', 'First']);
   });
@@ -42,17 +42,23 @@ describe('annotations and replies', () => {
   it('lists replies oldest first', async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
-    const thread = await addPost(request, student, { readingId: reading.id });
+    const annotation = await addPost(request, student, { readingId: reading.id });
     for (const text of ['First', 'Second', 'Third']) {
-      await addPost(request, instructor, { readingId: reading.id, annotationId: thread.id, text });
+      await addPost(request, instructor, {
+        readingId: reading.id,
+        annotationId: annotation.id,
+        text,
+      });
     }
 
-    const { replies } = await (await request(student, repliesPath(reading.id, thread.id))).json();
+    const { replies } = await (
+      await request(student, repliesPath(reading.id, annotation.id))
+    ).json();
 
     expect(replies.map((r: Reply) => r.text)).toEqual(['First', 'Second', 'Third']);
   });
 
-  it("shows each thread's reply count and latest activity", async () => {
+  it("shows each annotation's reply count and latest activity", async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
     const quiet = await addPost(request, student, { readingId: reading.id });
@@ -63,7 +69,7 @@ describe('annotations and replies', () => {
       annotationId: busy.id,
     });
 
-    const { annotations } = await (await request(student, threadsPath(reading.id))).json();
+    const { annotations } = await (await request(student, annotationsPath(reading.id))).json();
     const byId = new Map(annotations.map((a: Annotation) => [a.id, a]));
 
     expect(byId.get(busy.id)).toMatchObject({ replyCount: 2, lastActivityAt: latest.createdAt });
@@ -74,7 +80,7 @@ describe('annotations and replies', () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
 
-    const res = await request(student, threadsPath(reading.id), {
+    const res = await request(student, annotationsPath(reading.id), {
       method: 'POST',
       body: { text: '   ' },
     });
@@ -82,10 +88,10 @@ describe('annotations and replies', () => {
     expect(res.status).toBe(400);
   });
 
-  it("answers 404 for threads on a reading that doesn't exist", async () => {
+  it("answers 404 for annotations on a reading that doesn't exist", async () => {
     const { request, student } = createTestApp();
 
-    const res = await request(student, threadsPath('999'));
+    const res = await request(student, annotationsPath('999'));
 
     expect(res.status).toBe(404);
   });
@@ -94,9 +100,9 @@ describe('annotations and replies', () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
     const otherReading = await addReading(request, instructor);
-    const thread = await addPost(request, student, { readingId: otherReading.id });
+    const annotation = await addPost(request, student, { readingId: otherReading.id });
 
-    const res = await request(student, repliesPath(reading.id, thread.id));
+    const res = await request(student, repliesPath(reading.id, annotation.id));
 
     expect(res.status).toBe(404);
   });
@@ -105,14 +111,14 @@ describe('annotations and replies', () => {
     const { request, instructor } = createTestApp();
     const reading = await addReading(request, instructor);
 
-    const res = await request(null, threadsPath(reading.id));
+    const res = await request(null, annotationsPath(reading.id));
 
     expect(res.status).toBe(401);
   });
 });
 
 describe.each([
-  { kind: 'thread', pathFor: (readingId: string) => threadsPath(readingId) },
+  { kind: 'annotation', pathFor: (readingId: string) => annotationsPath(readingId) },
   {
     kind: 'reply',
     pathFor: (readingId: string, annotationId: string) => repliesPath(readingId, annotationId),
@@ -121,8 +127,8 @@ describe.each([
   async function setUp() {
     const app = createTestApp();
     const reading = await addReading(app.request, app.instructor);
-    const thread = await addPost(app.request, app.student, { readingId: reading.id });
-    const path = pathFor(reading.id, thread.id);
+    const annotation = await addPost(app.request, app.student, { readingId: reading.id });
+    const path = pathFor(reading.id, annotation.id);
     const post = (text: string) =>
       app.request(app.student, path, {
         method: 'POST',

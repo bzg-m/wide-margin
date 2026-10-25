@@ -13,7 +13,7 @@ Each requirement is tagged:
 
 - There is one implicit class, with no courses or enrollment.
 - Users are seeded, and signing in means picking one of them. There is no real authentication.
-- A reading has at most 100 threads, and a thread at most 30 replies. These limits are assumed, not enforced.
+- A reading has at most 100 annotations, and an annotation at most 30 replies. These limits are assumed, not enforced.
 - An annotation or reply is at most 2,000 characters. A reading's title is at most 200 characters and its description at most 2,000. These limits are enforced.
 
 ## Functional requirements
@@ -36,21 +36,21 @@ Each requirement is tagged:
 ### Reading view
 
 - **R10** (Core): Shows the reading's title, description and annotation count, and its discussion. Instructors also see how many students have participated.
-- **R11** (Core): Students and instructors can start a thread by posting an annotation. The text box is multi-line, with a Post button and a Ctrl+Enter (or Cmd+Enter) shortcut.
+- **R11** (Core): Students and instructors can post an annotation. The text box is multi-line, with a Post button and a Ctrl+Enter (or Cmd+Enter) shortcut.
 - **R12** (Chosen): Students and instructors can reply to an annotation. Replies are one level deep.
-- **R13** (Core): Threads are listed newest first by when they were started. A new reply does not move its thread. Threads can also be sorted by last activity.
-- **R14** (Chosen): Each thread shows its first annotation and its reply count. Opening a thread shows its replies, oldest first.
+- **R13** (Core): Annotations are listed newest first by when they were posted. A new reply does not move its annotation. Annotations can also be sorted by last activity.
+- **R14** (Chosen): Each annotation shows its reply count. Opening it shows its replies, oldest first.
 - **R15** (Core): Each annotation and reply shows its author and when it was posted, as a relative time with the exact time on hover.
 - **R16** (Chosen): Instructor posts are marked visually.
-- **R17** (Core): New threads and replies appear without a page refresh, for the author and for everyone else viewing the reading. This includes new threads arriving while a thread is open. The view shows whether live updates are connected.
+- **R17** (Core): New annotations and replies appear without a page refresh, for the author and for everyone else viewing the reading. This includes new annotations arriving while replies are open. The view shows whether live updates are connected.
 - **R18** (Core): Empty posts are rejected. A failed post keeps its draft and offers a retry.
 - **R19** (Core): The view handles every state gracefully: no annotations yet, loading, server unreachable, and a reading that does not exist.
 - **R20** (Chosen): An error caused by an action appears next to that action. Other problems appear in one status area, one at a time, so errors never pile up.
 
 ### Counting
 
-- **R21** (Chosen): A reading's annotation count includes threads and replies from students and instructors. The UI may show the split, for example "8 threads · 23 replies".
-- **R22** (Chosen): "Students participating" counts the distinct students who started a thread or replied.
+- **R21** (Chosen): A reading's annotation count is the number of its annotations, from students and instructors. Replies are counted separately, and the UI shows both with their total, for example "7 annotations · 15 replies · 22 posts".
+- **R22** (Chosen): "Students participating" counts the distinct students who posted an annotation or a reply.
 
 ### Input
 

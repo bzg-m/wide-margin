@@ -8,8 +8,8 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **Each surface is one view whose contents depend on permissions.** There is one readings list and one reading view for everyone. In a fuller app a person might teach one class and take another, and a single view per surface extends to that naturally.
 - **Permissions are checked in one place.** Code asks `can(user, action)` and never checks `user.role` directly. Today the function reads the user's role. A rule about a specific resource, such as "authors can edit their own posts", would add the resource as a third argument. Posting has no rule yet, because every signed-in user may post. If roles later belong to a membership (user × class × role, including TAs), only this function changes.
 - **Replies are the optional enhancement in scope.** They turn a list of comments into conversations, which is the core of a discussion app.
-- **Replies are one level deep.** A thread is already one strand of a reading's discussion. Nested branches would split it further and need a tree UI that doesn't fit narrow screens. Supporting them later would take an optional `inReplyToId` field and one database column; most of the work would be in the UI and in deleting replies that have children.
-- **Threads keep their place.** Threads are ordered by when they were started, and a new reply does not move its thread. Sorting by last activity is available instead.
+- **Replies are one level deep.** An annotation and its replies are already one strand of a reading's discussion. Nested branches would split it further and need a tree UI that doesn't fit narrow screens. Supporting them later would take an optional `inReplyToId` field and one database column; most of the work would be in the UI and in deleting replies that have children.
+- **Annotations keep their place.** Annotations are ordered by when they were posted, and a new reply does not move its annotation. Sorting by last activity is available instead.
 - **Instructor posts are marked.** Students can tell guidance from peer discussion at a glance.
 - **Sorting happens in the browser and is not saved.** The data is already loaded, so sorting is instant. If the choice should be saved later, a URL parameter (such as `?sort=-annotations`) survives refresh and can be shared.
 
@@ -17,20 +17,20 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 - **New readings are written in a side panel, not in the table.** The list stays usable while the panel is open, so an instructor can sort and scroll existing readings while choosing a title. A form inside the table would break as soon as the table was re-sorted. On phones, the form is its own screen. The table follows its own column's width (a CSS container query), so it becomes cards whenever the panel makes it narrow, not only on phones.
 - **The reading view has two columns on wide screens.** The reading's title, description and counts stay in view on the left while the discussion scrolls on the right. On phones they stack, and the description collapses.
-- **Threads open in place.** Opening a thread expands its replies beneath it. The same layout works at every screen size, and several threads can be open at once.
-- **Composers are multi-line with an explicit Post button.** Enter adds a line, and Ctrl+Enter (or Cmd+Enter) posts. The new-thread box sits above the threads, where new threads appear; the reply box sits at the end of an open thread, after its newest reply. Unsent text is kept as a draft in memory, so leaving a page and coming back (for example, to sign in again) keeps it; a full reload clears it.
+- **Replies open in place.** Opening an annotation's replies expands them beneath it. The same layout works at every screen size, and several annotations can be open at once.
+- **Composers are multi-line with an explicit Post button.** Enter adds a line, and Ctrl+Enter (or Cmd+Enter) posts. The annotation box sits above the annotations, where new ones appear; the reply box sits after an open annotation's newest reply. Unsent text is kept as a draft in memory, so leaving a page and coming back (for example, to sign in again) keeps it; a full reload clears it.
 - **Problems with live updates are app status.** A dropped or stopped stream is reported in the status area, below lost connections and ended sign-ins. While connected, the discussion shows a quiet "Live updates on", as plain text rather than a dot, which next to a name usually means a person is online.
-- **New threads don't move what you're reading.** If you're scrolled down, a "1 new thread" button counts other people's new threads and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as threads are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new thread's height.
+- **New annotations don't move what you're reading.** If you're scrolled down, a "1 new annotation" button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new annotation's height.
 - **Feedback stays proportionate.** A new post appearing is its own confirmation, and a new reading is placed first in the list with a short line confirming it. An error caused by an action appears next to that action. Problems with no triggering action share one status area that shows the most important one, so several failures never stack up.
 - **A lost connection is shown only in the status area,** whichever request discovers it, and it clears as soon as any request gets an answer. Pages and actions don't repeat it, so there's one message and one Retry button. The API client reports the connection after every request, which keeps the rule in one place.
 - **The app never leaves a page on its own.** When a request finds the sign-in has ended (a 401, for example after signing out in another tab), the status area says so and offers Sign in. The page, and anything typed on it, stays until the user chooses. A refused permission (a 403) is an ordinary error for the action that caused it.
 - **Light and dark themes.** The app follows the system setting and offers a manual switch. Every color is a CSS custom property, so a theme is one set of values.
-- **"Expand all" is deferred.** With replies loading per thread, expanding every thread would mean one request per thread. An endpoint returning all of a reading's replies would make it cheap, and instructor review is the case that would justify it.
+- **"Expand all" is deferred.** With replies loading per annotation, expanding every annotation would mean one request per annotation. An endpoint returning all of a reading's replies would make it cheap, and instructor review is the case that would justify it.
 - **Reading titles use a serif font.** The material reads differently from the discussion around it.
 
 ## Counting
 
-- **The annotation count includes threads and replies from everyone.** It measures how much discussion a reading has. The UI can show the split.
+- **Annotations and replies are counted separately.** The annotation count is what the requirements ask for: the number of annotations on a reading. Replies are conversation about those annotations, so they are shown beside it, with the total as posts: "7 annotations · 15 replies · 22 posts". Sorting by "Most annotations" uses the annotation count, so it matches the number in its column.
 - **"Students participating" counts students only.** It measures student engagement, which instructor posts would distort.
 - **Each counting rule is one query over the `posts` view** (see Data model), so changing a rule is one edit.
 
@@ -39,16 +39,16 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **Text is normalized rather than restricted to allowed characters.** Academic discussion needs accents, non-Latin scripts and symbols. Script injection is prevented by always displaying text as plain text, and database injection by parameterized queries. Normalizing and removing invisible or deceptive characters handles the remaining unwanted input.
 - **Text fields have character limits:** 2,000 for posts and reading descriptions, 200 for reading titles. A character limit works the same in every language and is easy to show with a counter.
 - **Characters are counted as Unicode code points everywhere.** The client, the server and the database's `CHECK` constraints then agree, including on emoji.
-- **Size assumptions are documented, not enforced.** Up to 100 threads per reading and 30 replies per thread. They justify loading a reading's threads, and a thread's replies, in full. Refusing a 31st reply would be a strange experience.
+- **Size assumptions are documented, not enforced.** Up to 100 annotations per reading and 30 replies per annotation. They justify loading a reading's annotations, and an annotation's replies, in full. Refusing a 31st reply would be a strange experience.
 
 ## API
 
 - **The API is resource-oriented HTTP and JSON.** It follows Google's API Improvement Proposals (AIP) where they don't depend on gRPC, and common HTTP standards elsewhere.
 - **Resources:** `users`, `readings`, `readings/{id}/annotations` and `readings/{id}/annotations/{id}/replies`, under `/v1`. Replies sit under their annotation because each belongs to exactly one.
 - **Methods are List and Get, plus Create for readings, annotations and replies.** Update and Delete can be added later without breaking clients.
-- **Replies load when a thread is opened.** The thread list includes each thread's `replyCount` and `lastActivityAt`, which keeps the first load small.
+- **Replies load when an annotation is opened.** The annotation list includes each annotation's `replyCount` and `lastActivityAt`, which keeps the first load small.
 - **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call. The participation count is left out of responses for users who may not view it, so the server enforces the rule rather than the UI hiding it.
-- **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`; 50 items by default, at most 100). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: threads are newest first and never deleted, so a thread posted mid-load can only cause a repeated item, which the client discards.
+- **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`; 50 items by default, at most 100). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: annotations are newest first and never deleted, so an annotation posted mid-load can only cause a repeated item, which the client discards.
 - **Errors use RFC 9457 Problem Details** (`application/problem+json`). An `errors` list carries field-level problems for the UI to show next to each field.
 - **The stored format and the API format are separate.** A small mapping function per resource turns database rows into API objects and keeps internal columns private, so storage can change without changing the API.
 - **Identity travels in a cookie set by the server.** `POST /v1/session` signs in, `GET /v1/session` says who is signed in, and `DELETE /v1/session` signs out. A cookie is the one mechanism that works for both normal requests and the event stream, since `EventSource` cannot send custom headers.
@@ -58,11 +58,11 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 How it works end to end is in [realtime.md](realtime.md).
 
 - **Live updates use Server-Sent Events (SSE).** SSE is built into the browser, reconnects on its own, and sends data from server to client, which is all that is needed because writes go through the API. Polling adds delay, and WebSockets add two-way machinery the app doesn't use.
-- **There is one stream per reading,** at `GET /v1/readings/{id}/events`. It carries every new thread and reply for that reading, whether or not a thread is open, so the thread list and reply counts stay current.
-- **The stream starts with a `ready` event, sent once the server is listening.** Every `ready`, first or after a reconnect, makes the client re-read the reading and its threads, so nothing posted before it was listening is missed. The browser's own `open` event can't promise that, because it fires before the server has subscribed.
+- **There is one stream per reading,** at `GET /v1/readings/{id}/events`. It carries every new annotation and reply for that reading, whether or not an annotation is open, so the annotation list and reply counts stay current.
+- **The stream starts with a `ready` event, sent once the server is listening.** Every `ready`, first or after a reconnect, makes the client re-read the reading and its annotations, so nothing posted before it was listening is missed. The browser's own `open` event can't promise that, because it fires before the server has subscribed.
 - **Each post is counted once, by ID.** A post can arrive twice, for example your own post in its create response and again from the stream; the second copy changes nothing.
-- **Counts update at once, then the server's replace them.** A new post raises its thread's and reading's counts locally, and a re-read from the server about 300 ms later replaces them. A re-read is applied only if nothing changed after it started, and only if no later re-read has been applied, so an older response can't undo a newer post. If it fails, the local counts stay.
-- **Re-reading replaces replaying missed events,** which would need a stored event log. Open threads' replies are reloaded at the same time.
+- **Counts update at once, then the server's replace them.** A new post raises its annotation's and reading's counts locally, and a re-read from the server about 300 ms later replaces them. A re-read is applied only if nothing changed after it started, and only if no later re-read has been applied, so an older response can't undo a newer post. If it fails, the local counts stay.
+- **Re-reading replaces replaying missed events,** which would need a stored event log. Open annotations' replies are reloaded at the same time.
 - **Only new posts are published.** A retried create with the same `Idempotency-Key` publishes nothing.
 - **A heartbeat event every 15 seconds** keeps proxies from closing a quiet stream, and lets the client notice a dead one. The browser can't always tell that a connection has died, so after 30 seconds without any event the client replaces the stream. The heartbeat is a named event because `EventSource` never passes comments to the page.
 - **Concurrent posts never conflict.** Replies are all accepted and ordered by server time. If editing is added, ETags would prevent one edit from silently overwriting another.
@@ -84,7 +84,7 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Data model
 
 - **Tables:** `users`, `readings`, `annotations` and `replies`. A reply points to its annotation and has no reading of its own, so the schema guarantees that replies are one level deep and belong to their annotation's reading. Each table matches one API resource.
-- **A `posts` view combines annotations and replies,** each row tagged as a thread or a reply.
+- **A `posts` view combines annotations and replies,** each row tagged as an annotation or a reply. A view holds no data, so it is rebuilt at every start and an existing database always gets the current definition.
 - **IDs are integers in the database and strings in the API.** Integers are easy to work with while debugging, and switching to opaque IDs later wouldn't change the API.
 - **Timestamps are set by the server** as ISO 8601 UTC text with milliseconds, for example `2026-10-24T15:04:05.123Z`. They are readable and sort correctly as text. Ties are broken by ID.
 - **Idempotency keys are unique per user,** so one user's keys can't collide with another's. Sending a key is optional in the API.
@@ -92,7 +92,7 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Database
 
 - **SQLite, behind a small data layer.** It needs no setup, so a fresh clone runs. The data is relational: users, readings, annotations and replies, with counts and distinct participants.
-- **Each index serves a known query:** the readings list, a reading's threads, a thread's replies, and idempotency-key lookups.
+- **Each index serves a known query:** the readings list, a reading's annotations, an annotation's replies, and idempotency-key lookups.
 - **Foreign keys are enforced.** SQLite itself leaves them off by default. Node's driver turns them on, and the code requests it explicitly.
 - **Tables are `STRICT`.** By default SQLite stores any value in any column; strict tables enforce the declared types.
 - **The schema is created at startup, and a new database is seeded with sample data.** A fresh clone runs with no extra setup, and `npm run db:reset` starts over. A real deployment would use versioned migrations.

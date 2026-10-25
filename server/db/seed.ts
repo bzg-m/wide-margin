@@ -38,15 +38,15 @@ export function seed(db: DatabaseSync, now = Date.now()): void {
         minutesAgo(reading.minutesAgo),
       ) as Inserted;
 
-      for (const thread of reading.threads) {
+      for (const annotation of reading.annotations) {
         const { id: annotationId } = insertAnnotation.get(
           readingId,
-          idOf(thread.author),
-          thread.text,
-          minutesAgo(thread.minutesAgo),
+          idOf(annotation.author),
+          annotation.text,
+          minutesAgo(annotation.minutesAgo),
         ) as Inserted;
 
-        for (const reply of thread.replies) {
+        for (const reply of annotation.replies) {
           insertReply.run(
             annotationId,
             idOf(reply.author),

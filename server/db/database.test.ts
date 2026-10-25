@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './database.ts';
@@ -86,17 +89,39 @@ describe('database schema', () => {
     const otherReadingId = addReading();
     // Reply IDs are deliberately out of step with annotation IDs,
     // so joining replies on the wrong column would change the result.
-    const otherThreadId = addAnnotation('Other thread', { readingId: otherReadingId });
-    const threadId = addAnnotation('Thread');
-    addReply(threadId, 'First reply');
-    addReply(threadId, 'Second reply');
-    addReply(otherThreadId, 'Reply on the other reading');
+    const otherAnnotationId = addAnnotation('Other annotation', { readingId: otherReadingId });
+    const annotationId = addAnnotation('Annotation');
+    addReply(annotationId, 'First reply');
+    addReply(annotationId, 'Second reply');
+    addReply(otherAnnotationId, 'Reply on the other reading');
 
     const posts = db
       .prepare('SELECT kind FROM posts WHERE reading_id = ? ORDER BY kind')
       .all(readingId);
 
-    expect(posts).toEqual([{ kind: 'reply' }, { kind: 'reply' }, { kind: 'thread' }]);
+    expect(posts).toEqual([{ kind: 'annotation' }, { kind: 'reply' }, { kind: 'reply' }]);
+  });
+});
+
+describe('openDatabase', () => {
+  it('replaces an outdated posts view when an existing database is opened', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'collab-read-'));
+    const path = join(dir, 'test.db');
+    try {
+      const old = openDatabase(path);
+      seed(old);
+      old.exec(`DROP VIEW posts;
+        CREATE VIEW posts AS SELECT reading_id, author_id, created_at, 'outdated' AS kind FROM annotations`);
+      old.close();
+
+      const db = openDatabase(path);
+      const kinds = db.prepare('SELECT DISTINCT kind FROM posts ORDER BY kind').all();
+      db.close();
+
+      expect(kinds).toEqual([{ kind: 'annotation' }, { kind: 'reply' }]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 });
 

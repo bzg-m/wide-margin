@@ -14,10 +14,10 @@ import { requireUser, type AppEnv } from '../auth.ts';
 import { KEY_REUSED } from '../db/idempotency.ts';
 import {
   createReply,
-  createThread,
-  findThread,
+  createAnnotation,
+  findAnnotation,
   listReplies,
-  listThreads,
+  listAnnotations,
   type NewPost,
 } from '../db/posts.ts';
 import { findReading } from '../db/readings.ts';
@@ -31,7 +31,7 @@ type AnnotationEnv = AppEnv & { Variables: { annotation: Annotation } };
 // readingId. TypeScript can't see the mount path from here, so the `!` tells it the value exists.
 const readingIdOf = (c: Context) => c.req.param('readingId')!;
 
-/** Routes under /v1/readings/:readingId/annotations: threads and their replies. New posts are published to `events`. */
+/** Routes under /v1/readings/:readingId/annotations: annotations and their replies. New posts are published to `events`. */
 export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
   routes.use(requireUser(db));
@@ -47,7 +47,7 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
   /** Loads the annotation named in the path, answering 404 unless it belongs to this reading. */
   const requireAnnotation = createMiddleware<AnnotationEnv>(async (c, next) => {
     // Only used on routes whose path includes :annotationId.
-    const annotation = findThread(db, c.req.param('annotationId')!);
+    const annotation = findAnnotation(db, c.req.param('annotationId')!);
     if (!annotation || annotation.readingId !== readingIdOf(c)) {
       throw new HTTPException(404, { message: 'Annotation not found.' });
     }
@@ -58,7 +58,7 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
   routes.get('/', (c) => {
     const readingId = readingIdOf(c);
     const { items, nextPageToken } = paginate(c, (offset, limit) =>
-      listThreads(db, readingId, offset, limit),
+      listAnnotations(db, readingId, offset, limit),
     );
     return c.json({ annotations: items, nextPageToken } satisfies ListAnnotationsResponse);
   });
@@ -66,7 +66,7 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
   routes.post('/', jsonBody(createPostBody), (c) => {
     const body = c.req.valid('json');
     const post = newPost(body, c.get('user'), c.req.header('Idempotency-Key'));
-    const result = createThread(db, readingIdOf(c), post);
+    const result = createAnnotation(db, readingIdOf(c), post);
     if (result === KEY_REUSED) throw keyReused();
     const { resource: annotation, isNew } = result;
     if (isNew) {

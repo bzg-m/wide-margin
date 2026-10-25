@@ -30,3 +30,8 @@ export function relativeTime(iso: string, now = Date.now(), locale?: string): st
 export function exactTime(iso: string, locale?: string): string {
   return new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
+
+/** A count with its noun, singular for exactly one: "1 reply", "3 replies". */
+export function countOf(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}

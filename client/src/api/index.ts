@@ -76,32 +76,32 @@ export async function countStudents(): Promise<number> {
 
 // IDs come from the URL, so they're encoded before going into a request path.
 const readingPath = (readingId: string) => `/readings/${encodeURIComponent(readingId)}`;
-const threadsPath = (readingId: string) => `${readingPath(readingId)}/annotations`;
+const annotationsPath = (readingId: string) => `${readingPath(readingId)}/annotations`;
 const repliesPath = (readingId: string, annotationId: string) =>
-  `${threadsPath(readingId)}/${encodeURIComponent(annotationId)}/replies`;
+  `${annotationsPath(readingId)}/${encodeURIComponent(annotationId)}/replies`;
 
 /** One reading, with its counts. */
 export const getReading = (readingId: string) => api.request<Reading>(readingPath(readingId));
 
-/** Every thread on a reading, newest first. */
+/** Every annotation on a reading, newest first. */
 export const listAnnotations = (readingId: string) =>
   api.listAll<Annotation>(
-    threadsPath(readingId),
+    annotationsPath(readingId),
     'annotations' satisfies keyof ListAnnotationsResponse,
   );
 
-/** Every reply in a thread, oldest first. */
+/** Every reply to an annotation, oldest first. */
 export const listReplies = (readingId: string, annotationId: string) =>
   api.listAll<Reply>(
     repliesPath(readingId, annotationId),
     'replies' satisfies keyof ListRepliesResponse,
   );
 
-/** Starts a thread. The same idempotency key must be used for every attempt at one post. */
+/** Posts an annotation. The same idempotency key must be used for every attempt at one post. */
 export const createAnnotation = (readingId: string, body: CreatePostBody, idempotencyKey: string) =>
-  api.request<Annotation>(threadsPath(readingId), { method: 'POST', body, idempotencyKey });
+  api.request<Annotation>(annotationsPath(readingId), { method: 'POST', body, idempotencyKey });
 
-/** Replies in a thread. The same idempotency key must be used for every attempt at one post. */
+/** Replies to an annotation. The same idempotency key must be used for every attempt at one post. */
 export const createReply = (
   readingId: string,
   annotationId: string,

@@ -9,7 +9,7 @@ import {
   listAnnotations,
   listReplies,
 } from '../api/index.ts';
-import { applyReply, applyThread, mergeReplies, type DiscussionState } from '../discussion.ts';
+import { applyAnnotation, applyReply, mergeReplies, type DiscussionState } from '../discussion.ts';
 import { connectToReading } from '../live.ts';
 import { useSession } from './session.ts';
 import { Priority, useStatus } from './status.ts';
@@ -19,7 +19,7 @@ const REREAD_DELAY_MS = 300;
 const LIVE_PROBLEM = 'live-updates';
 
 /**
- * The reading being viewed: its details, its threads, and the replies of each thread opened,
+ * The reading being viewed: its details, its annotations, and the replies of each annotation opened,
  * kept current by the reading's event stream. New posts update the counts at once; a re-read
  * from the server then replaces them. See docs/realtime.md.
  */
@@ -29,12 +29,12 @@ export const useDiscussion = defineStore('discussion', () => {
 
   const readingId = ref<string | null>(null);
   const reading = ref<Reading | null>(null);
-  const threads = ref<Annotation[]>([]);
+  const annotations = ref<Annotation[]>([]);
   const replies = ref<Record<string, Reply[]>>({});
   /** Whether the event stream is connected. */
   const live = ref(false);
-  /** Other people's threads that arrived while the top of the list was out of view. */
-  const unseenNewThreads = ref(0);
+  /** Other people's annotations that arrived while the top of the list was out of view. */
+  const unseenNewAnnotations = ref(0);
 
   let counted = new Set<string>();
   let topInView = true;
@@ -54,7 +54,7 @@ export const useDiscussion = defineStore('discussion', () => {
     leave();
     readingId.value = id;
     connect(id);
-    await loadReadingAndThreads(id);
+    await loadReadingAndAnnotations(id);
   }
 
   /** Stops showing the reading: closes its event stream and clears its status message. */
@@ -65,14 +65,14 @@ export const useDiscussion = defineStore('discussion', () => {
     status.resolve(LIVE_PROBLEM);
     readingId.value = null;
     reading.value = null;
-    threads.value = [];
+    annotations.value = [];
     replies.value = {};
     counted = new Set();
     live.value = false;
-    unseenNewThreads.value = 0;
+    unseenNewAnnotations.value = 0;
   }
 
-  /** Loads a thread's replies, keeping any already shown. Load errors are thrown. */
+  /** Loads an annotation's replies, keeping any already shown. Load errors are thrown. */
   async function loadReplies(annotationId: string): Promise<void> {
     const id = readingId.value!;
     const loaded = await listReplies(id, annotationId);
@@ -83,14 +83,14 @@ export const useDiscussion = defineStore('discussion', () => {
     };
   }
 
-  /** Starts a thread, shows it at once, and schedules a re-read of the counts. */
-  async function postThread(body: CreatePostBody, idempotencyKey: string): Promise<void> {
+  /** Posts an annotation, shows it at once, and schedules a re-read of the counts. */
+  async function postAnnotation(body: CreatePostBody, idempotencyKey: string): Promise<void> {
     const id = readingId.value!;
-    const thread = await createAnnotation(id, body, idempotencyKey);
-    if (readingId.value === id) addThread(thread);
+    const annotation = await createAnnotation(id, body, idempotencyKey);
+    if (readingId.value === id) addAnnotation(annotation);
   }
 
-  /** Replies in a thread, shows the reply at once, and schedules a re-read of the counts. */
+  /** Replies to an annotation, shows the reply at once, and schedules a re-read of the counts. */
   async function postReply(
     annotationId: string,
     body: CreatePostBody,
@@ -101,10 +101,10 @@ export const useDiscussion = defineStore('discussion', () => {
     if (readingId.value === id) addReply(reply);
   }
 
-  /** Tells the store whether the top of the thread list is on screen. Seeing it clears the unseen count. */
+  /** Tells the store whether the top of the annotation list is on screen. Seeing it clears the unseen count. */
   function setTopInView(inView: boolean): void {
     topInView = inView;
-    if (inView) unseenNewThreads.value = 0;
+    if (inView) unseenNewAnnotations.value = 0;
   }
 
   function connect(id: string): void {
@@ -119,10 +119,10 @@ export const useDiscussion = defineStore('discussion', () => {
           loadReplies(annotationId).catch(() => {});
         }
       },
-      onThread: (thread) => {
-        const added = addThread(thread);
-        if (added && !topInView && thread.authorId !== session.user?.id) {
-          unseenNewThreads.value++;
+      onAnnotation: (annotation) => {
+        const added = addAnnotation(annotation);
+        if (added && !topInView && annotation.authorId !== session.user?.id) {
+          unseenNewAnnotations.value++;
         }
       },
       onReply: (reply) => void addReply(reply),
@@ -156,13 +156,13 @@ export const useDiscussion = defineStore('discussion', () => {
   // Each returns whether the post was new to this page. Until the reading has loaded there's
   // nothing to add to, and the loads already in progress may have started before the post was
   // saved, so a fresh re-read is scheduled; it starts after the post and so includes it.
-  function addThread(thread: Annotation): boolean {
+  function addAnnotation(annotation: Annotation): boolean {
     if (!reading.value) {
       scheduleReread();
       return false;
     }
     const current = currentState();
-    const next = applyThread(current, thread);
+    const next = applyAnnotation(current, annotation);
     if (next === current) return false;
     update(next);
     return true;
@@ -181,12 +181,17 @@ export const useDiscussion = defineStore('discussion', () => {
   }
 
   function currentState(): DiscussionState {
-    return { reading: reading.value!, threads: threads.value, replies: replies.value, counted };
+    return {
+      reading: reading.value!,
+      annotations: annotations.value,
+      replies: replies.value,
+      counted,
+    };
   }
 
   function update(state: DiscussionState): void {
     reading.value = state.reading;
-    threads.value = state.threads;
+    annotations.value = state.annotations;
     replies.value = state.replies;
     counted = state.counted;
     changes++;
@@ -198,16 +203,19 @@ export const useDiscussion = defineStore('discussion', () => {
     rereadTimer = setTimeout(() => void reread(), REREAD_DELAY_MS);
   }
 
-  // Loads the reading and its threads, replacing what's shown unless the result is out of date.
-  async function loadReadingAndThreads(id: string): Promise<void> {
+  // Loads the reading and its annotations, replacing what's shown unless the result is out of date.
+  async function loadReadingAndAnnotations(id: string): Promise<void> {
     const load = ++loadsStarted;
     const changesAtStart = changes;
-    const [loadedReading, loadedThreads] = await Promise.all([getReading(id), listAnnotations(id)]);
+    const [loadedReading, loadedAnnotations] = await Promise.all([
+      getReading(id),
+      listAnnotations(id),
+    ]);
     const outOfDate = changesAtStart !== changes || load < newestLoadUsed;
     if (readingId.value !== id || outOfDate) return;
     newestLoadUsed = load;
     reading.value = loadedReading;
-    threads.value = loadedThreads;
+    annotations.value = loadedAnnotations;
   }
 
   // If a re-read fails, the counts updated locally stay, and a lost connection is already shown
@@ -216,7 +224,7 @@ export const useDiscussion = defineStore('discussion', () => {
     const id = readingId.value;
     if (id === null) return;
     try {
-      await loadReadingAndThreads(id);
+      await loadReadingAndAnnotations(id);
     } catch {
       // Keep what's shown.
     }
@@ -224,14 +232,14 @@ export const useDiscussion = defineStore('discussion', () => {
 
   return {
     reading,
-    threads,
+    annotations,
     replies,
     live,
-    unseenNewThreads,
+    unseenNewAnnotations,
     show,
     leave,
     loadReplies,
-    postThread,
+    postAnnotation,
     postReply,
     setTopInView,
   };

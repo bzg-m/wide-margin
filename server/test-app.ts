@@ -65,7 +65,7 @@ export async function addReading(
   return res.json();
 }
 
-/** Posts a thread on a reading, or a reply to `annotationId`, through the API. Returns the created post. */
+/** Posts an annotation on a reading, or a reply to `annotationId`, through the API. Returns the created post. */
 export async function addPost(
   request: TestRequest,
   user: User,

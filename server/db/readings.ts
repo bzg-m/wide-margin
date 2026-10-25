@@ -7,7 +7,7 @@ import { parseId } from './ids.ts';
 // The counting rules: every count on a reading comes from this query over the posts view.
 const SELECT_READINGS = `
   SELECT r.id, r.title, r.description, r.creator_id, r.created_at,
-    COUNT(p.kind) FILTER (WHERE p.kind = 'thread') AS thread_count,
+    COUNT(p.kind) FILTER (WHERE p.kind = 'annotation') AS annotation_count,
     COUNT(p.kind) FILTER (WHERE p.kind = 'reply') AS reply_count,
     COUNT(DISTINCT p.author_id) FILTER (WHERE u.role = 'student') AS participating_student_count,
     MAX(p.created_at) AS last_activity_at
@@ -21,7 +21,7 @@ type ReadingRow = {
   description: string;
   creator_id: number;
   created_at: string;
-  thread_count: number;
+  annotation_count: number;
   reply_count: number;
   participating_student_count: number;
   last_activity_at: string | null;
@@ -34,7 +34,7 @@ function toReading(row: ReadingRow): Reading {
     description: row.description,
     creatorId: String(row.creator_id),
     createdAt: row.created_at,
-    threadCount: row.thread_count,
+    annotationCount: row.annotation_count,
     replyCount: row.reply_count,
     participatingStudentCount: row.participating_student_count,
     lastActivityAt: row.last_activity_at,
@@ -72,7 +72,7 @@ export type NewReading = CreateReadingBody & {
  */
 export function createReading(db: DatabaseSync, input: NewReading): CreateResult<Reading> {
   const creatorId = Number(input.creatorId);
-  // The same steps appear in createThread and createReply; see the note in posts.ts.
+  // The same steps appear in createAnnotation and createReply; see the note in posts.ts.
   // Node runs one request's code at a time, switching only at an `await`. These database
   // calls are synchronous, so no other request can run between this lookup and the insert.
   // (The UNIQUE constraint still blocks a duplicate if that ever changes.)

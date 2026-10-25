@@ -8,7 +8,12 @@ import PostComposer from './PostComposer.vue';
 /** Mounts a composer whose send calls the given fake. */
 function mountComposer(send: (body: { text: string }, key: string) => Promise<unknown>) {
   return mount(PostComposer, {
-    props: { draftKey: 'thread:1', label: 'Start a thread', placeholder: 'Say something', send },
+    props: {
+      draftKey: 'annotation:1',
+      label: 'Add an annotation',
+      placeholder: 'Say something',
+      send,
+    },
     global: { plugins: [createPinia()] },
   });
 }

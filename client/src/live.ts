@@ -7,9 +7,9 @@ const SILENCE_LIMIT_MS = 2 * HEARTBEAT_INTERVAL_MS;
 export type LiveHandlers = {
   /** The stream is listening. Fires on the first connection and again after every reconnect. */
   onReady: () => void;
-  /** Someone started a thread on the reading. */
-  onThread: (thread: Annotation) => void;
-  /** Someone replied in one of the reading's threads. */
+  /** Someone posted an annotation on the reading. */
+  onAnnotation: (annotation: Annotation) => void;
+  /** Someone replied to one of the reading's annotations. */
   onReply: (reply: Reply) => void;
   /** The connection dropped or went quiet, and the stream is being reopened. */
   onReconnecting: () => void;
@@ -53,7 +53,7 @@ export function connectToReading(
     current.addEventListener(EventName.Heartbeat, heardFromServer);
     current.addEventListener(EventName.AnnotationCreated, (event) => {
       heardFromServer();
-      handlers.onThread(dataOf(event));
+      handlers.onAnnotation(dataOf(event));
     });
     current.addEventListener(EventName.ReplyCreated, (event) => {
       heardFromServer();

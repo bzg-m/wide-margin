@@ -12,11 +12,11 @@ import { attemptFor, type Attempt } from '../idempotency.ts';
 import { useDrafts } from '../stores/drafts.ts';
 
 /**
- * A multi-line box for starting a thread or replying. Its text is kept as a draft, so it survives
+ * A multi-line box for posting an annotation or a reply. Its text is kept as a draft, so it survives
  * leaving the page; `send` is called with the cleaned text and an idempotency key.
  */
 const props = defineProps<{
-  /** Names this form's draft, such as "thread:3" or "reply:17". */
+  /** Names this form's draft, such as "annotation:3" or "reply:17". */
   draftKey: string;
   /** Read by screen readers as the text box's name. */
   label: string;
