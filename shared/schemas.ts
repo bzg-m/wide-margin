@@ -31,6 +31,9 @@ export const createPostBody = z.object({
   text: cleanText('Text', limits.postText, sanitizeText),
 });
 
+/** The body for signing in as a seeded user. */
+export const signInBody = z.object({ userId: z.string({ error: 'Choose a user.' }) });
+
 /** A validated, cleaned body for creating a reading. */
 export type CreateReadingBody = z.infer<typeof createReadingBody>;
 
@@ -38,7 +41,7 @@ export type CreateReadingBody = z.infer<typeof createReadingBody>;
 export type CreatePostBody = z.infer<typeof createPostBody>;
 
 /** Turns a Zod error into API field errors: one per field, keeping the first problem reported for each. */
-export function toFieldErrors(error: z.ZodError): FieldError[] {
+export function toFieldErrors(error: z.core.$ZodError): FieldError[] {
   const errors = new Map<string, string>();
   for (const issue of error.issues) {
     // Zod gives a field's location as a list of keys, such as ['author', 'name'] for a

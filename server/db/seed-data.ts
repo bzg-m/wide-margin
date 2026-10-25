@@ -1,4 +1,6 @@
-type SeedUser = { key: string; displayName: string; role: 'student' | 'instructor' };
+import { Role } from '../../shared/api.ts';
+
+type SeedUser = { key: string; displayName: string; role: Role };
 type SeedPost = { author: string; minutesAgo: number; text: string };
 type SeedThread = SeedPost & { replies: SeedPost[] };
 type SeedReading = {
@@ -14,20 +16,20 @@ const DAY = 24 * HOUR;
 
 /** Sample users, referred to elsewhere in this file by `key`. */
 export const users: SeedUser[] = [
-  { key: 'lee', displayName: 'Dr. Maya Lee', role: 'instructor' },
-  { key: 'ortiz', displayName: 'Sam Ortiz', role: 'instructor' },
-  { key: 'sarah', displayName: 'Sarah Kim', role: 'student' },
-  { key: 'michael', displayName: 'Michael Reyes', role: 'student' },
-  { key: 'priya', displayName: 'Priya Shah', role: 'student' },
-  { key: 'jordan', displayName: 'Jordan Blake', role: 'student' },
-  { key: 'aisha', displayName: 'Aisha Bello', role: 'student' },
-  { key: 'tom', displayName: 'Tom Nguyen', role: 'student' },
-  { key: 'lena', displayName: 'Lena Fischer', role: 'student' },
-  { key: 'omar', displayName: 'Omar Haddad', role: 'student' },
-  { key: 'grace', displayName: 'Grace Liu', role: 'student' },
-  { key: 'diego', displayName: 'Diego Alvarez', role: 'student' },
-  { key: 'hannah', displayName: 'Hannah Cohen', role: 'student' },
-  { key: 'kofi', displayName: 'Kofi Mensah', role: 'student' },
+  { key: 'lee', displayName: 'Dr. Maya Lee', role: Role.Instructor },
+  { key: 'ortiz', displayName: 'Sam Ortiz', role: Role.Instructor },
+  { key: 'sarah', displayName: 'Sarah Kim', role: Role.Student },
+  { key: 'michael', displayName: 'Michael Reyes', role: Role.Student },
+  { key: 'priya', displayName: 'Priya Shah', role: Role.Student },
+  { key: 'jordan', displayName: 'Jordan Blake', role: Role.Student },
+  { key: 'aisha', displayName: 'Aisha Bello', role: Role.Student },
+  { key: 'tom', displayName: 'Tom Nguyen', role: Role.Student },
+  { key: 'lena', displayName: 'Lena Fischer', role: Role.Student },
+  { key: 'omar', displayName: 'Omar Haddad', role: Role.Student },
+  { key: 'grace', displayName: 'Grace Liu', role: Role.Student },
+  { key: 'diego', displayName: 'Diego Alvarez', role: Role.Student },
+  { key: 'hannah', displayName: 'Hannah Cohen', role: Role.Student },
+  { key: 'kofi', displayName: 'Kofi Mensah', role: Role.Student },
 ];
 
 /** Sample readings with their threads and replies. Times are minutes before seeding. */

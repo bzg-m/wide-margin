@@ -10,6 +10,6 @@ if (isNewDatabase) seed(db);
 
 const port = Number(process.env.PORT ?? 3000);
 
-serve({ fetch: createApp().fetch, port }, (info) => {
+serve({ fetch: createApp(db).fetch, port }, (info) => {
   console.log(`API listening on http://localhost:${info.port}`);
 });

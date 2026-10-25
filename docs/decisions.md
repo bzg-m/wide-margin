@@ -6,7 +6,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 - **Sign-in is simulated by picking a seeded user.** Account creation would add forms and edge cases without helping anyone read or discuss.
 - **Each surface is one view whose contents depend on permissions.** There is one readings list and one reading view for everyone. In a fuller app a person might teach one class and take another, and a single view per surface extends to that naturally.
-- **Permissions are checked per resource, not per role.** Code asks `can(user, action, resource)` and never checks `user.role` directly. Today the function reads the user's role. If roles later belong to a membership (user × class × role, including TAs), only this function changes.
+- **Permissions are checked in one place.** Code asks `can(user, action)` and never checks `user.role` directly. Today the function reads the user's role. A rule about a specific resource, such as "authors can edit their own posts", would add the resource as a third argument. If roles later belong to a membership (user × class × role, including TAs), only this function changes.
 - **Replies are the optional enhancement in scope.** They turn a list of comments into conversations, which is the core of a discussion app.
 - **Replies are one level deep.** A thread is already one strand of a reading's discussion. Nested branches would split it further and need a tree UI that doesn't fit narrow screens. Supporting them later would take an optional `inReplyToId` field and one database column; most of the work would be in the UI and in deleting replies that have children.
 - **Threads keep their place.** Threads are ordered by when they were started, and a new reply does not move its thread. Sorting by last activity is available instead.
@@ -46,10 +46,10 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **Methods are List and Get, plus Create for readings, annotations and replies.** Update and Delete can be added later without breaking clients.
 - **Replies load when a thread is opened.** The thread list includes each thread's `replyCount` and `lastActivityAt`, which keeps the first load small.
 - **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call.
-- **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: threads are newest first and never deleted, so a thread posted mid-load can only cause a repeated item, which the client discards.
+- **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`; 50 items by default, at most 100). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: threads are newest first and never deleted, so a thread posted mid-load can only cause a repeated item, which the client discards.
 - **Errors use RFC 9457 Problem Details** (`application/problem+json`). An `errors` list carries field-level problems for the UI to show next to each field.
 - **The stored format and the API format are separate.** A small mapping function per resource turns database rows into API objects and keeps internal columns private, so storage can change without changing the API.
-- **Identity travels in a cookie.** It is the one mechanism that works for both normal requests and the event stream, since `EventSource` cannot send custom headers.
+- **Identity travels in a cookie set by the server.** `POST /v1/session` signs in, `GET /v1/session` says who is signed in, and `DELETE /v1/session` signs out. A cookie is the one mechanism that works for both normal requests and the event stream, since `EventSource` cannot send custom headers.
 
 ## Real-time updates
 
@@ -63,8 +63,15 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 ## Reliability and caching
 
 - **Failed requests are retried automatically** after network errors, 5xx and 429 responses, with growing randomized delays. Other 4xx responses are not retried.
-- **Creates are safe to retry.** Each carries an `Idempotency-Key` header, which the server stores with a uniqueness constraint. A repeated key returns the resource created the first time, and the same key with different content is rejected.
+- **Creates are safe to retry.** Each carries an `Idempotency-Key` header, which the server stores with a uniqueness constraint. A repeated key returns the resource created the first time, and the same key with different content is rejected with a 422, as the IETF `Idempotency-Key` draft specifies.
 - **There is no caching layer.** The data changes often and the stream keeps it current. The browser caches build files, and the client keeps loaded data in memory between views. At scale, stored counters and ETags would come first.
+
+## Security
+
+- **Sign-in is simulated, and the docs say so.** The cookie holds a user ID with no signature, so anyone can claim to be anyone. Real authentication would replace the cookie's contents, not the way it travels.
+- **The cookie is `HttpOnly` and `SameSite=Lax`.** Page scripts can't read it, and browsers don't send it with requests that other sites start, which is the main defense against cross-site request forgery.
+- **Writes accept only JSON.** Another site can't send a JSON request without a CORS preflight, and the server never approves one.
+- **Hono's `csrf()` middleware rejects form submissions from other sites,** checking the `Origin` and `Sec-Fetch-Site` headers. It covers the classic attack even in a browser that ignores `SameSite`.
 
 ## Data model
 
