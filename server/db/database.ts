@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 
+/** Where the database file lives: `DB_PATH` if set, otherwise the project root. */
 export const defaultDatabasePath = process.env.DB_PATH ?? 'collab-read.db';
 
 /** Opens a database, enforces foreign keys and creates any missing tables. */

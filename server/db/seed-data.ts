@@ -12,6 +12,7 @@ type SeedReading = {
 const HOUR = 60;
 const DAY = 24 * HOUR;
 
+/** Sample users, referred to elsewhere in this file by `key`. */
 export const users: SeedUser[] = [
   { key: 'lee', displayName: 'Dr. Maya Lee', role: 'instructor' },
   { key: 'ortiz', displayName: 'Sam Ortiz', role: 'instructor' },
@@ -29,6 +30,7 @@ export const users: SeedUser[] = [
   { key: 'kofi', displayName: 'Kofi Mensah', role: 'student' },
 ];
 
+/** Sample readings with their threads and replies. Times are minutes before seeding. */
 export const readings: SeedReading[] = [
   {
     title: 'Supervised vs. unsupervised learning',

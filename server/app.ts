@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { problemResponse } from './problem.ts';
 
+/** Builds the API app without starting a server, so tests can call it directly. */
 export function createApp(): Hono {
   const app = new Hono();
 
