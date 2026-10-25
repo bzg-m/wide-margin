@@ -78,8 +78,9 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 - **SQLite, behind a small data layer.** It needs no setup, so a fresh clone runs. The data is relational: users, readings, annotations and replies, with counts and distinct participants.
 - **Each index serves a known query:** the readings list, a reading's threads, a thread's replies, and idempotency-key lookups.
-- **Foreign keys are switched on for every connection** (`PRAGMA foreign_keys = ON`). SQLite leaves them off by default.
-- **The schema is created at startup, and a reset command rebuilds the database.** A real deployment would use versioned migrations.
+- **Foreign keys are enforced.** SQLite itself leaves them off by default. Node's driver turns them on, and the code requests it explicitly.
+- **Tables are `STRICT`.** By default SQLite stores any value in any column; strict tables enforce the declared types.
+- **The schema is created at startup, and a new database is seeded with sample data.** A fresh clone runs with no extra setup, and `npm run db:reset` starts over. A real deployment would use versioned migrations.
 - **Changing databases would mean rewriting the data layer, not the app.** A document store, for example, would replace joins with lookups and distinct counts with aggregations or stored counters, behind the same functions.
 - **Some future data suits other stores.** Reading content (PDFs, video) belongs in object storage. Reading metadata that varies by type, and annotation anchors (a text range, a video timestamp, an image region), are document-shaped. A JSON column would also work.
 
