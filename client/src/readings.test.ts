@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Reading } from '../../shared/api.ts';
-import { defaultSort, nextSort, sortReadings, SortKey } from './readings.ts';
+import { defaultSort, nextSort, sortChoices, sortReadings, SortKey } from './readings.ts';
 
 function reading(fields: Partial<Reading> & { id: string }): Reading {
   return {
@@ -66,6 +66,31 @@ describe('sortReadings', () => {
 
     expect(ids(sorted)).toEqual(['annotations', 'replies']);
   });
+});
+
+describe('sortChoices', () => {
+  it.each([true, false])(
+    'offers every column order in both directions, once each (participation shown: %s)',
+    (showParticipation) => {
+      const keys = Object.values(SortKey).filter(
+        (key) => showParticipation || key !== SortKey.Students,
+      );
+
+      const choices = sortChoices(showParticipation);
+
+      for (const key of keys) {
+        for (const descending of [true, false]) {
+          const matching = choices.filter(
+            (c) => c.sort.key === key && c.sort.descending === descending,
+          );
+          expect(matching).toHaveLength(1);
+        }
+      }
+      expect(choices).toHaveLength(keys.length * 2);
+      // The menu finds the current order by value, so no two choices may share one.
+      expect(new Set(choices.map((c) => c.value)).size).toBe(choices.length);
+    },
+  );
 });
 
 describe('nextSort', () => {

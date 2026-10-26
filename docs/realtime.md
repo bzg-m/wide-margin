@@ -20,7 +20,7 @@ data: {"id":"40","annotationId":"12", ...}
 
 ```
 
-`event` names the kind of message and `data` carries it, here as JSON. A line starting with `:` is a comment, which the browser reads but never passes to the page.
+`event` names the kind of message and `data` carries it, here as JSON. A line starting with `:` is a comment. The browser reads comments but never passes them to the page, which is why the heartbeat is a named event (see Inside the stream).
 
 SSE only sends from server to client. That's all the app needs, because posting goes through the normal API.
 
@@ -82,7 +82,7 @@ The client's side lives in [client/src/live.ts](../client/src/live.ts), which wr
 - **A reply can briefly be counted twice.** A re-read returns counts, not the replies behind them, so if its counts already include a reply whose event arrives afterwards, the event adds one more. That event also schedules a re-read, which corrects the count within about 300 ms plus a request. Making it exact would mean events carrying the server's counts, which isn't worth it for a blip that fixes itself.
 - **A quiet stream is replaced.** Every event, heartbeats included, shows the stream is alive. After 30 seconds with none, twice the heartbeat interval, the client closes the stream, reports that it is reconnecting and opens a new one, whose `ready` re-reads as usual. A stream closed for good is left closed until the user asks to reconnect.
 - **Problems show in the status area.** A dropped connection shows "Live updates paused. Reconnecting…", and a stream closed for good shows "Live updates stopped." with a Reconnect button. Both rank below "Can't reach the server", so a server outage shows one message. While connected, the discussion shows a quiet "Live updates on".
-- **New annotations don't move what you're reading.** When the top of the annotation list is out of view, a button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new annotation's height.
+- **New annotations don't move what you're reading.** When the top of the annotation list is out of view, a button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring yet (as of Safari 26), so there the page shifts down by the new annotation's height.
 
 ## Limits at scale
 

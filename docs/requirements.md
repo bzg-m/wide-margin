@@ -41,7 +41,7 @@ Each requirement is tagged:
 - **R13** (Core): Annotations are listed newest first by when they were posted. A new reply does not move its annotation. Annotations can also be sorted by last activity.
 - **R14** (Chosen): Each annotation shows its reply count. Opening it shows its replies, oldest first. Instructors can show every reply on the reading at once.
 - **R15** (Core): Each annotation and reply shows its author and when it was posted, as a relative time with the exact time on hover.
-- **R16** (Chosen): Instructor posts are marked visually.
+- **R16** (Chosen): Instructor posts, and the viewer's own posts, are marked visually, with text as well as color.
 - **R17** (Core): New annotations and replies appear without a page refresh, for the author and for everyone else viewing the reading. This includes new annotations arriving while replies are open. The view shows whether live updates are connected.
 - **R18** (Core): Empty posts are rejected. A failed post keeps its draft and offers a retry.
 - **R19** (Core): The view handles every state gracefully: no annotations yet, loading, server unreachable, and a reading that does not exist.
@@ -62,7 +62,7 @@ Each requirement is tagged:
   - rejects text that is empty or contains only invisible characters,
   - rejects text over 2,000 characters.
 
-  The client shows a character counter and runs the same checks for early feedback.
+  The client shows a character counter as the text nears the limit and runs the same checks for early feedback.
 
 ### Reliability
 
@@ -74,7 +74,7 @@ Each requirement is tagged:
 
 - Replies: in scope (R12).
 - Automated tests: in scope.
-- Filter by student, search, participation dashboard, editing and deleting: not yet decided.
+- Filter by student, search, participation dashboard, editing and deleting: left for later; see Open in [decisions.md](decisions.md).
 
 ## Non-functional requirements
 
@@ -83,12 +83,12 @@ Each requirement is tagged:
 - **N3** The server is the source of truth for validation. Errors have one consistent format, which the UI turns into helpful messages.
 - **N4** Database access sits behind a small data layer.
 - **N5** The code is easy to review: small files, request and response types shared by client and server, and simple code over clever code.
-- **N6** Basic accessibility: labelled inputs, full keyboard use, visible focus, and sensible focus after posting.
+- **N6** Basic accessibility: labelled inputs, full keyboard use, visible focus, and sensible focus after posting, after moving between pages and when a control closes. Text has at least 4.5:1 contrast and field borders at least 3:1, in both themes.
 - **N7** Times are stored in UTC and shown in the viewer's local time.
 - **N8** Security within scope: parameterized queries, user text never rendered as HTML, and documentation stating that authentication is simulated.
 - **N9** Counts come from indexed queries.
 - **N10** The layout works down to about 360px wide. On narrow screens, tables become stacked cards, column sorting becomes a menu, and tap targets are at least 44px.
-- **N11** Light and dark themes: the app follows the system setting and offers a manual switch.
+- **N11** Light and dark themes: the app follows the system setting.
 
 ## Not in scope
 

@@ -6,27 +6,38 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 - **Sign-in is simulated by picking a seeded user.** Account creation would add forms and edge cases without helping anyone read or discuss.
 - **Each surface is one view whose contents depend on permissions.** There is one readings list and one reading view for everyone. In a fuller app a person might teach one class and take another, and a single view per surface extends to that naturally.
-- **Permissions are checked in one place.** Code asks `can(user, action)` and never checks `user.role` directly. Today the function reads the user's role. A rule about a specific resource, such as "authors can edit their own posts", would add the resource as a third argument. Posting has no rule yet, because every signed-in user may post. If roles later belong to a membership (user × class × role, including TAs), only this function changes.
+- **Permissions are checked in one place.** Code asks `can(user, action)`, and permission decisions never check `user.role` directly; outside `can()`, the role is only displayed (badges) or counted. Today the function reads the user's role. A rule about a specific resource, such as "authors can edit their own posts", would add the resource as a third argument. Posting has no rule yet, because every signed-in user may post. If roles later belong to a membership (user × class × role, including TAs), only this function changes.
 - **Replies are the optional enhancement in scope.** They turn a list of comments into conversations, which is the core of a discussion app.
 - **Replies are one level deep.** An annotation and its replies are already one strand of a reading's discussion. Nested branches would split it further and need a tree UI that doesn't fit narrow screens. Supporting them later would take an optional `inReplyToId` field and one database column; most of the work would be in the UI and in deleting replies that have children.
 - **Annotations keep their place.** Annotations are ordered by when they were posted, and a new reply does not move its annotation. Sorting by last activity is available instead.
 - **Instructor posts are marked.** Students can tell guidance from peer discussion at a glance.
+- **Your own posts carry a "You" badge.** In a long discussion, people look for what they wrote and for replies to it. The name stays, so you see yourself as others do. A badge, rather than another tint or border, still works on an instructor's own post, which already has the instructor tint. It is outlined where the instructor badge is filled, so the two differ in shape and wording, not only in color.
 - **Sorting happens in the browser and is not saved.** The data is already loaded, so sorting is instant. If the choice should be saved later, a URL parameter (such as `?sort=-annotations`) survives refresh and can be shared.
+- **The phone sort menu offers every order the column headers can,** in both directions, such as "Oldest" and "Title Z to A". Sorting by a column and then narrowing the window keeps the same order, and the menu shows it.
 
 ## Interface
 
 - **New readings are written in a side panel, not in the table.** The list stays usable while the panel is open, so an instructor can sort and scroll existing readings while choosing a title. A form inside the table would break as soon as the table was re-sorted. On phones, the form is its own screen. The table follows its own column's width (a CSS container query), so it becomes cards whenever the panel makes it narrow, not only on phones.
 - **The reading view has two columns on wide screens.** The reading's title, description and counts stay in view on the left while the discussion scrolls on the right. On phones they stack, and the description collapses.
 - **Replies open in place.** Opening an annotation's replies expands them beneath it. The same layout works at every screen size, and several annotations can be open at once.
+- **Instructors can show all replies at once.** Reviewing a reading's discussion is an instructor's main task, so one click opens every annotation that has replies, loaded with one request. Annotations without replies stay closed, since opening them would only add empty reply boxes. Students don't see the button, which keeps their view simpler; it is a rule in `can()`, so giving it to everyone is a one-line change. The server doesn't check it, because every reply is readable anyway.
 - **Composers are multi-line with an explicit Post button.** Enter adds a line, and Ctrl+Enter (or Cmd+Enter) posts. The annotation box sits above the annotations, where new ones appear; the reply box sits after an open annotation's newest reply. Unsent text is kept as a draft in memory, so leaving a page and coming back (for example, to sign in again) keeps it; a full reload clears it.
 - **Problems with live updates are app status.** A dropped or stopped stream is reported in the status area, below lost connections and ended sign-ins. While connected, the discussion shows a quiet "Live updates on", as plain text rather than a dot, which next to a name usually means a person is online.
-- **New annotations don't move what you're reading.** If you're scrolled down, a "1 new annotation" button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring, so there the page shifts down by the new annotation's height.
+- **New annotations don't move what you're reading.** If you're scrolled down, a "1 new annotation" button counts other people's new annotations and scrolls up when clicked. Chrome, Edge and Firefox also keep the page still as annotations are added above, using scroll anchoring. Safari doesn't support scroll anchoring yet (as of Safari 26), so there the page shifts down by the new annotation's height.
 - **Feedback stays proportionate.** A new post appearing is its own confirmation, and a new reading is placed first in the list with a short line confirming it. An error caused by an action appears next to that action. Problems with no triggering action share one status area that shows the most important one, so several failures never stack up.
 - **A lost connection is shown only in the status area,** whichever request discovers it, and it clears as soon as any request gets an answer. Pages and actions don't repeat it, so there's one message and one Retry button. The API client reports the connection after every request, which keeps the rule in one place.
 - **The app never leaves a page on its own.** When a request finds the sign-in has ended (a 401, for example after signing out in another tab), the status area says so and offers Sign in. The page, and anything typed on it, stays until the user chooses. A refused permission (a 403) is an ordinary error for the action that caused it.
-- **Light and dark themes.** The app follows the system setting and offers a manual switch. Every color is a CSS custom property, so a theme is one set of values.
-- **Instructors can show all replies at once.** Reviewing a reading's discussion is an instructor's main task, so one click opens every annotation that has replies, loaded with one request. Annotations without replies stay closed, since opening them would only add empty reply boxes. Students don't see the button, which keeps their view simpler; it is a rule in `can()`, so giving it to everyone is a one-line change. The server doesn't check it, because every reply is readable anyway.
+- **Light and dark themes.** The app follows the system setting. Every color is a CSS custom property, so a theme is one set of values. There is no manual switch: the system setting is a sound default, and it keeps a rarely used control out of the interface.
 - **Reading titles use a serif font.** The material reads differently from the discussion around it.
+
+## Accessibility
+
+- **Moving to another page moves focus to its heading** and gives the browser tab the page's name, such as "Supervised vs. unsupervised learning · Collab read". In a single-page app nothing else tells a screen reader that the page changed. Opening the new-reading panel only changes the query, so it keeps focus in the form.
+- **Focus never disappears with its control.** When the new-reading panel closes, by Cancel, Create or the back button, focus returns to "New reading". The "new annotations" button focuses the newest annotation as it goes. A form with errors focuses the first field that has one, so its error is read.
+- **Bylines carry hidden commas,** so screen readers and copied text get "Sarah Kim, You, 2 hours ago" rather than the parts run together.
+- **Reply toggles are named after the annotation's author** for screen readers, such as "Reply to Michael Reyes", starting with the visible text so voice control still finds them.
+- **Text fields and menus have a darker border than cards.** A field's border is its only edge, so it needs 3:1 contrast; card borders and dividers are decorative.
+- **Left as they are:** the annotation box is labelled for screen readers but shows only its placeholder, which suits a single box under the reading; exact times appear on hover only; and new annotations from others aren't announced, which would be noisy in a busy discussion.
 
 ## Counting
 
@@ -46,7 +57,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 - **The API is resource-oriented HTTP and JSON.** It follows Google's API Improvement Proposals (AIP) where they don't depend on gRPC, and common HTTP standards elsewhere.
 - **Resources:** `users`, `readings`, `readings/{id}/annotations` and `readings/{id}/annotations/{id}/replies`, under `/v1`. Replies sit under their annotation because each belongs to exactly one. `readings/{id}/annotations/-/replies` lists the replies of every annotation on a reading, using AIP-159's `-` for "any annotation".
 - **Methods are List and Get, plus Create for readings, annotations and replies.** Update and Delete can be added later without breaking clients.
-- **Replies load when an annotation is opened.** The annotation list includes each annotation's `replyCount` and `lastActivityAt`, which keeps the first load small.
+- **Replies load when an annotation is opened,** or all at once when an instructor shows all replies. The annotation list includes each annotation's `replyCount` and `lastActivityAt`, which keeps the first load small.
 - **Counts are read-only fields on the reading,** computed by the server, so the readings list needs one call. The participation count is left out of responses for users who may not view it, so the server enforces the rule rather than the UI hiding it.
 - **List methods are paginated from the start** (`pageSize`, `pageToken`, `nextPageToken`; 50 items by default, at most 100). Adding pagination later would break clients. The client follows page tokens until none is left. The token encodes a position, which is simple and safe here: annotations are newest first and never deleted, so an annotation posted mid-load can only cause a repeated item, which the client discards.
 - **Errors use RFC 9457 Problem Details** (`application/problem+json`). An `errors` list carries field-level problems for the UI to show next to each field.
@@ -92,7 +103,7 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Database
 
 - **SQLite, behind a small data layer.** It needs no setup, so a fresh clone runs. The data is relational: users, readings, annotations and replies, with counts and distinct participants.
-- **Each index serves a known query:** the readings list, a reading's annotations, an annotation's replies, and idempotency-key lookups.
+- **Each index serves a known query:** the readings list, a reading's annotations, an annotation's replies, and idempotency-key lookups. Listing all of a reading's replies uses the same two indexes and sorts the result, which stays small under the size assumptions.
 - **Foreign keys are enforced.** SQLite itself leaves them off by default. Node's driver turns them on, and the code requests it explicitly.
 - **Tables are `STRICT`.** By default SQLite stores any value in any column; strict tables enforce the declared types.
 - **The schema is created at startup, and a new database is seeded with sample data.** A fresh clone runs with no extra setup, and `npm run db:reset` starts over. A real deployment would use versioned migrations.
@@ -101,7 +112,7 @@ How it works end to end is in [realtime.md](realtime.md).
 
 ## Stack and tooling
 
-- **Node 26, pinned.** It is the active long-term-support release. `.nvmrc`, `engines` and `engine-strict` make `npm install` stop with a clear message on any other version.
+- **Node 26, pinned.** It is the newest even-numbered release, which becomes long-term support in October 2026. `.nvmrc`, `engines` and `engine-strict` make `npm install` stop with a clear message on any other version.
 - **The server's TypeScript runs directly on Node,** with no build step; `tsc` only checks types. The `erasableSyntaxOnly` setting rules out syntax Node can't run, such as enums.
 - **One package with `client/`, `server/` and `shared/` folders.** There is one install. Shared code is imported by relative path, because Node doesn't strip types from packages inside `node_modules`.
 - **SQLite through Node's built-in `node:sqlite`.** There is nothing to install or compile. The module is at release-candidate stability; the driver is used in one file, so `better-sqlite3` is an easy fallback.

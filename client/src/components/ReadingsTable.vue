@@ -186,6 +186,13 @@ th {
     border: none;
   }
 
+  /* On a card, the title is the way into the reading, so it gets a full-size tap target. */
+  .reading-title {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
   .title-cell {
     width: auto;
     padding-bottom: var(--space-2);

@@ -9,6 +9,11 @@ export const RouteName = {
   NotFound: 'not-found',
 } as const;
 
+/** The browser tab's title for a page, such as "Readings · Collab read". */
+export function pageTitle(name?: string): string {
+  return name ? `${name} · Collab read` : 'Collab read';
+}
+
 /**
  * Where to go after signing in: the sign-in page's `redirect`, if it's a path within this app,
  * otherwise the readings list. Only paths starting with a single "/" are followed, so a link

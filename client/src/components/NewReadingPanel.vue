@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import type { Reading } from '../../../shared/api.ts';
 import {
   createReadingBody,
@@ -37,7 +37,17 @@ const sending = ref(false);
 // before sending again, the earlier version may also have been saved, leaving two readings.
 // Once readings can be edited, offer to apply the changes to the saved one instead.
 const titleInput = useTemplateRef<HTMLInputElement>('title-input');
+const descriptionInput = useTemplateRef<HTMLTextAreaElement>('description-input');
 onMounted(() => titleInput.value?.focus());
+
+// Focus goes to the first field with an error, so a screen reader reads that error, which the
+// field points to with aria-describedby.
+async function showFieldErrors(errors: Record<string, string>) {
+  fieldErrors.value = errors;
+  await nextTick();
+  if (errors.title) titleInput.value?.focus();
+  else if (errors.description) descriptionInput.value?.focus();
+}
 
 // Counters appear as a field nears its limit, rather than all the time.
 const titleCount = computed(() => characterCount(title.value));
@@ -53,8 +63,8 @@ async function submit() {
     description: description.value,
   });
   if (!parsed.success) {
-    fieldErrors.value = Object.fromEntries(
-      toFieldErrors(parsed.error).map((e) => [e.field, e.message]),
+    void showFieldErrors(
+      Object.fromEntries(toFieldErrors(parsed.error).map((e) => [e.field, e.message])),
     );
     return;
   }
@@ -72,7 +82,7 @@ async function submit() {
     // The status area shows lost connections and ended sign-ins; the draft stays for another try.
     if (isShownInStatusArea(error)) return;
     if (error instanceof ApiError && error.fieldErrors.length > 0) {
-      fieldErrors.value = Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message]));
+      void showFieldErrors(Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message])));
     } else {
       formError.value =
         error instanceof Error ? error.message : 'The reading could not be created.';
@@ -103,7 +113,7 @@ function discard() {
         v-model="title"
         class="field"
         :aria-invalid="!!fieldErrors.title"
-        aria-describedby="reading-title-error"
+        :aria-describedby="fieldErrors.title ? 'reading-title-error' : undefined"
       />
       <p v-if="nearLimit(titleCount, limits.readingTitle)" class="counter muted">
         {{ titleCount }} / {{ limits.readingTitle }}
@@ -113,12 +123,13 @@ function discard() {
       <label for="reading-description">Description</label>
       <textarea
         id="reading-description"
+        ref="description-input"
         v-model="description"
         class="field"
         rows="5"
         placeholder="What students should read, and what to look for"
         :aria-invalid="!!fieldErrors.description"
-        aria-describedby="reading-description-error"
+        :aria-describedby="fieldErrors.description ? 'reading-description-error' : undefined"
       />
       <p v-if="nearLimit(descriptionCount, limits.readingDescription)" class="counter muted">
         {{ descriptionCount }} / {{ limits.readingDescription }}
@@ -171,7 +182,7 @@ label {
 .field {
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-field-border);
   border-radius: var(--radius);
   background: var(--color-page);
   color: var(--color-text);

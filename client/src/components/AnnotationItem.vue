@@ -26,6 +26,14 @@ const toggleLabel = computed(() => {
   const last = relativeTime(props.annotation.lastActivityAt, now.value);
   return `${count} ${count === 1 ? 'reply' : 'replies'} · last ${last}`;
 });
+// For screen readers, which reach every toggle in turn: says whose annotation it belongs to. It
+// starts with the visible label, so voice control finds the button by what's on screen.
+const toggleName = computed(() => {
+  const author = props.annotation.authorDisplayName;
+  return props.annotation.replyCount === 0
+    ? `Reply to ${author}`
+    : `${toggleLabel.value}, on ${author}'s annotation`;
+});
 
 async function loadReplies() {
   loading.value = true;
@@ -59,6 +67,7 @@ const sendReply = (body: CreatePostBody, key: string) =>
 <template>
   <article class="annotation">
     <PostContent
+      :author-id="annotation.authorId"
       :author-display-name="annotation.authorDisplayName"
       :author-role="annotation.authorRole"
       :created-at="annotation.createdAt"
@@ -67,6 +76,7 @@ const sendReply = (body: CreatePostBody, key: string) =>
     <button
       type="button"
       class="toggle"
+      :aria-label="toggleName"
       :aria-expanded="open"
       :aria-controls="repliesId"
       @click="discussion.toggle(annotation.id)"
@@ -82,6 +92,7 @@ const sendReply = (body: CreatePostBody, key: string) =>
       <ol v-if="replies && replies.length > 0" class="reply-list">
         <li v-for="reply in replies" :key="reply.id">
           <PostContent
+            :author-id="reply.authorId"
             :author-display-name="reply.authorDisplayName"
             :author-role="reply.authorRole"
             :created-at="reply.createdAt"

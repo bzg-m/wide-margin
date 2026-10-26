@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { allowOrRedirect, RouteName } from './navigation.ts';
+import { allowOrRedirect, pageTitle, RouteName } from './navigation.ts';
 import { useSession } from './stores/session.ts';
 import NotFoundView from './views/NotFoundView.vue';
 import ReadingsView from './views/ReadingsView.vue';
@@ -11,10 +11,26 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: { name: RouteName.Readings } },
-    { path: '/sign-in', name: RouteName.SignIn, component: SignInView },
-    { path: '/readings', name: RouteName.Readings, component: ReadingsView },
+    {
+      path: '/sign-in',
+      name: RouteName.SignIn,
+      component: SignInView,
+      meta: { title: 'Choose who you are' },
+    },
+    {
+      path: '/readings',
+      name: RouteName.Readings,
+      component: ReadingsView,
+      meta: { title: 'Readings' },
+    },
+    // The reading view sets its own title once the reading has loaded.
     { path: '/readings/:readingId', name: RouteName.Reading, component: ReadingView, props: true },
-    { path: '/:path(.*)*', name: RouteName.NotFound, component: NotFoundView },
+    {
+      path: '/:path(.*)*',
+      name: RouteName.NotFound,
+      component: NotFoundView,
+      meta: { title: 'Page not found' },
+    },
   ],
 });
 
@@ -29,4 +45,8 @@ router.beforeEach(async (to) => {
     }
   }
   return allowOrRedirect(to, session.user);
+});
+
+router.afterEach((to) => {
+  document.title = pageTitle(typeof to.meta.title === 'string' ? to.meta.title : undefined);
 });

@@ -17,6 +17,42 @@ export type Sort = { key: SortKey; descending: boolean };
 /** Newest first by creation date, unless the user picks otherwise. */
 export const defaultSort: Sort = { key: SortKey.Created, descending: true };
 
+// Titles start A to Z; every other column starts largest or newest first.
+const startsDescending = (key: SortKey) => key !== SortKey.Title;
+
+/** One choice in the sort menu, with a stable `value` for the menu's option. */
+export type SortChoice = { value: string; label: string; sort: Sort };
+
+// Menu labels for each column, usual direction first, in the order the menu lists them.
+const sortLabels: { key: SortKey; first: string; second: string }[] = [
+  { key: SortKey.Created, first: 'Newest', second: 'Oldest' },
+  { key: SortKey.LastActivity, first: 'Recent activity', second: 'Least recent activity' },
+  { key: SortKey.Annotations, first: 'Most annotations', second: 'Fewest annotations' },
+  { key: SortKey.Students, first: 'Most students', second: 'Fewest students' },
+  { key: SortKey.Title, first: 'Title A to Z', second: 'Title Z to A' },
+];
+
+/** The menu's value for a sort, such as "created:desc". */
+export const sortValue = (sort: Sort) => `${sort.key}:${sort.descending ? 'desc' : 'asc'}`;
+
+/**
+ * The sort menu used on narrow screens. It offers every order the column headers can produce, in
+ * both directions, so changing layout never changes the order. Without participation, the
+ * Students choices are left out.
+ */
+export function sortChoices(showParticipation: boolean): SortChoice[] {
+  return sortLabels
+    .filter(({ key }) => showParticipation || key !== SortKey.Students)
+    .flatMap(({ key, first, second }) => {
+      const usual = { key, descending: startsDescending(key) };
+      const other = { key, descending: !usual.descending };
+      return [
+        { value: sortValue(usual), label: first, sort: usual },
+        { value: sortValue(other), label: second, sort: other },
+      ];
+    });
+}
+
 /** All posts on a reading: its annotations and their replies. */
 export function postCount(reading: Reading): number {
   return reading.annotationCount + reading.replyCount;
@@ -51,5 +87,5 @@ export function sortReadings(readings: Reading[], sort: Sort): Reading[] {
  */
 export function nextSort(current: Sort, key: SortKey): Sort {
   if (current.key === key) return { key, descending: !current.descending };
-  return { key, descending: key !== SortKey.Title };
+  return { key, descending: startsDescending(key) };
 }

@@ -8,7 +8,7 @@ import AnnotationItem from '../components/AnnotationItem.vue';
 import PostComposer from '../components/PostComposer.vue';
 import ReadingDetails from '../components/ReadingDetails.vue';
 import { AnnotationOrder, sortAnnotations } from '../discussion.ts';
-import { RouteName } from '../navigation.ts';
+import { pageTitle, RouteName } from '../navigation.ts';
 import { useDiscussion } from '../stores/discussion.ts';
 import { useSession } from '../stores/session.ts';
 
@@ -74,6 +74,14 @@ async function loadStudentCount() {
 
 watch(() => props.readingId, load, { immediate: true });
 
+watch(
+  () => discussion.reading?.title ?? (notFound.value ? 'Reading not found' : undefined),
+  (title) => {
+    document.title = pageTitle(title);
+  },
+  { immediate: true },
+);
+
 // Watches whether the top of the annotation list is on screen, for the new-annotations button.
 const listTop = useTemplateRef<HTMLElement>('list-top');
 let topObserver: IntersectionObserver | undefined;
@@ -86,8 +94,15 @@ watch(listTop, (element) => {
   topObserver.observe(element);
 });
 
+// Scrolls up to the new annotations and focuses the newest, since the button disappears once the
+// top is in view. The scroll jumps instead of gliding when the system asks for less motion.
+const annotationList = useTemplateRef<HTMLElement>('annotation-list');
 function showNewAnnotations() {
-  listTop.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  listTop.value?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  const newest = annotationList.value?.querySelector('article');
+  newest?.setAttribute('tabindex', '-1');
+  newest?.focus({ preventScroll: true });
 }
 
 onUnmounted(() => {
@@ -191,11 +206,13 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
         <p v-if="discussion.annotations.length === 0" class="empty muted">
           No annotations yet. Start the discussion with a question or an observation.
         </p>
-        <AnnotationItem
-          v-for="annotation in sortedAnnotations"
-          :key="annotation.id"
-          :annotation="annotation"
-        />
+        <div ref="annotation-list">
+          <AnnotationItem
+            v-for="annotation in sortedAnnotations"
+            :key="annotation.id"
+            :annotation="annotation"
+          />
+        </div>
       </section>
     </div>
   </div>
@@ -255,11 +272,16 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
 }
 
 .order button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 var(--space-3);
   border: none;
   background: var(--color-surface);
   color: var(--color-text-muted);
+}
+
+/* Drawn inside the button, since the group's rounded corners clip anything outside it. */
+.order button:focus-visible {
+  outline-offset: -3px;
 }
 
 .order button[aria-pressed='true'] {
@@ -291,7 +313,7 @@ const sendAnnotation = (body: CreatePostBody, key: string) => discussion.postAnn
   display: block;
   margin: 0 auto var(--space-2);
   padding: var(--space-1) var(--space-4);
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid var(--color-accent);
   border-radius: 999px;
   background: var(--color-surface);

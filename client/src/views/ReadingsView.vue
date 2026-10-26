@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { Reading } from '../../../shared/api.ts';
 import { Action, can } from '../../../shared/permissions.ts';
@@ -7,7 +7,14 @@ import { isServerUnreachable, isShownInStatusArea } from '../api/client.ts';
 import { countStudents } from '../api/index.ts';
 import NewReadingPanel from '../components/NewReadingPanel.vue';
 import ReadingsTable from '../components/ReadingsTable.vue';
-import { defaultSort, nextSort, sortReadings, SortKey, type Sort } from '../readings.ts';
+import {
+  defaultSort,
+  nextSort,
+  sortChoices,
+  sortReadings,
+  sortValue,
+  type Sort,
+} from '../readings.ts';
 import { useReadings } from '../stores/readings.ts';
 import { useSession } from '../stores/session.ts';
 
@@ -34,23 +41,22 @@ const confirmation = ref('');
 // The panel is open while the URL has ?new, so on a phone the back button closes it.
 const panelOpen = computed(() => 'new' in route.query);
 
+// However the panel closes (Cancel, Create or the back button), focus returns to the button that
+// opened it, instead of being lost with the panel.
+const newReadingButton = useTemplateRef<HTMLButtonElement>('new-reading-button');
+watch(panelOpen, async (open, wasOpen) => {
+  if (open || !wasOpen) return;
+  await nextTick();
+  newReadingButton.value?.focus();
+});
+
 // For the phone layout, where column headers give way to a menu.
-const sortChoices = computed(() => [
-  { label: 'Newest', sort: { key: SortKey.Created, descending: true } },
-  { label: 'Recent activity', sort: { key: SortKey.LastActivity, descending: true } },
-  { label: 'Most annotations', sort: { key: SortKey.Annotations, descending: true } },
-  ...(canSeeParticipation.value
-    ? [{ label: 'Most students', sort: { key: SortKey.Students, descending: true } }]
-    : []),
-  { label: 'Title A to Z', sort: { key: SortKey.Title, descending: false } },
-]);
-const sortChoice = computed({
-  get: () =>
-    sortChoices.value.findIndex(
-      (c) => c.sort.key === sort.value.key && c.sort.descending === sort.value.descending,
-    ),
-  set: (index: number) => {
-    sort.value = sortChoices.value[index].sort;
+const menuChoices = computed(() => sortChoices(canSeeParticipation.value));
+const menuValue = computed({
+  get: () => sortValue(sort.value),
+  set: (value: string) => {
+    const choice = menuChoices.value.find((c) => c.value === value);
+    if (choice) sort.value = choice.sort;
   },
 });
 
@@ -111,7 +117,13 @@ onMounted(load);
     <div class="list-column">
       <div class="page-heading">
         <h1>Readings</h1>
-        <button v-if="canCreate" type="button" class="button primary" @click="openPanel">
+        <button
+          v-if="canCreate"
+          ref="new-reading-button"
+          type="button"
+          class="button primary"
+          @click="openPanel"
+        >
           New reading
         </button>
       </div>
@@ -135,8 +147,8 @@ onMounted(load);
       <template v-else>
         <label class="sort-menu">
           Sort by
-          <select v-model.number="sortChoice">
-            <option v-for="(choice, index) in sortChoices" :key="choice.label" :value="index">
+          <select v-model="menuValue">
+            <option v-for="choice in menuChoices" :key="choice.value" :value="choice.value">
               {{ choice.label }}
             </option>
           </select>
@@ -234,12 +246,20 @@ onMounted(load);
     margin-bottom: var(--space-3);
   }
 
+  /* appearance: none lets Safari use these styles instead of its native look. That also removes
+     the built-in arrow, so a small chevron is drawn with two gradients in the text color. */
   .sort-menu select {
+    appearance: none;
     min-height: 44px;
-    padding: 0 var(--space-2);
-    border: 1px solid var(--color-border);
+    padding: 0 calc(var(--space-2) + 1.25rem) 0 var(--space-2);
+    border: 1px solid var(--color-field-border);
     border-radius: var(--radius);
-    background: var(--color-surface);
+    background:
+      linear-gradient(45deg, transparent 50%, currentColor 50%) right 14px center / 5px 5px
+        no-repeat,
+      linear-gradient(135deg, currentColor 50%, transparent 50%) right 9px center / 5px 5px
+        no-repeat,
+      var(--color-surface);
     color: var(--color-text);
     font: inherit;
   }

@@ -51,8 +51,10 @@ const participation = computed(() => {
 
 <style scoped>
 .back {
-  display: inline-block;
-  margin-bottom: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: var(--space-1);
   font-size: 0.875rem;
 }
 
