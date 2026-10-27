@@ -78,6 +78,51 @@ describe('annotations and replies', () => {
     expect(replies.map((r: Reply) => r.text)).toEqual(['On second', 'On first']);
   });
 
+  it.each(['annotation', 'reply'])(
+    'serves a created %s at the URL in its Location header',
+    async (kind) => {
+      const { request, student, instructor } = createTestApp();
+      const reading = await addReading(request, instructor);
+      const annotation = await addPost(request, student, { readingId: reading.id });
+      const path =
+        kind === 'annotation'
+          ? annotationsPath(reading.id)
+          : repliesPath(reading.id, annotation.id);
+
+      const created = await request(student, path, { method: 'POST', body: { text: 'New post' } });
+      const location = created.headers.get('Location');
+      const fetched = await request(student, location ?? '');
+
+      expect(location).toBeTruthy();
+      expect(fetched.status).toBe(200);
+      expect(await fetched.json()).toEqual(await created.json());
+    },
+  );
+
+  it('answers 404 for a post addressed through the wrong parent', async () => {
+    const { request, student, instructor } = createTestApp();
+    const reading = await addReading(request, instructor);
+    const otherReading = await addReading(request, instructor);
+    const annotation = await addPost(request, student, { readingId: reading.id });
+    const otherAnnotation = await addPost(request, student, { readingId: reading.id });
+    const reply = await addPost(request, student, {
+      readingId: reading.id,
+      annotationId: annotation.id,
+    });
+
+    const annotationElsewhere = await request(
+      student,
+      `${annotationsPath(otherReading.id)}/${annotation.id}`,
+    );
+    const replyElsewhere = await request(
+      student,
+      `${repliesPath(reading.id, otherAnnotation.id)}/${reply.id}`,
+    );
+
+    expect(annotationElsewhere.status).toBe(404);
+    expect(replyElsewhere.status).toBe(404);
+  });
+
   it("shows each annotation's reply count and latest activity", async () => {
     const { request, student, instructor } = createTestApp();
     const reading = await addReading(request, instructor);

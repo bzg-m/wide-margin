@@ -7,6 +7,7 @@ import {
   type Annotation,
   type ListAnnotationsResponse,
   type ListRepliesResponse,
+  type Reply,
   type User,
 } from '../../shared/api.ts';
 import { createPostBody, type CreatePostBody } from '../../shared/schemas.ts';
@@ -16,6 +17,7 @@ import {
   createAnnotation,
   createReply,
   findAnnotation,
+  findReply,
   listAnnotations,
   listReadingReplies,
   listReplies,
@@ -27,6 +29,7 @@ import { paginate } from '../pagination.ts';
 import { jsonBody } from '../validation.ts';
 
 type AnnotationEnv = AppEnv & { Variables: { annotation: Annotation } };
+type ReplyEnv = AnnotationEnv & { Variables: { reply: Reply } };
 
 // These routes are mounted under /v1/readings/:readingId/annotations, so every request has a
 // readingId. TypeScript can't see the mount path from here, so the `!` tells it the value exists.
@@ -45,14 +48,36 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
     await next();
   });
 
-  /** Loads the annotation named in the path, answering 404 unless it belongs to this reading. */
-  const requireAnnotation = createMiddleware<AnnotationEnv>(async (c, next) => {
-    // Only used on routes whose path includes :annotationId.
+  // The annotation named in the path. Answers 404 unless it belongs to this reading.
+  // Only used on routes whose path includes :annotationId.
+  function annotationInPath(c: Context): Annotation {
     const annotation = findAnnotation(db, c.req.param('annotationId')!);
     if (!annotation || annotation.readingId !== readingIdOf(c)) {
       throw new HTTPException(404, { message: 'Annotation not found.' });
     }
+    return annotation;
+  }
+
+  /** Loads the annotation named in the path, answering 404 unless it belongs to this reading. */
+  const requireAnnotation = createMiddleware<AnnotationEnv>(async (c, next) => {
+    c.set('annotation', annotationInPath(c));
+    await next();
+  });
+
+  /**
+   * Loads the reply named in the path and its annotation, answering 404 unless the reply belongs to
+   * that annotation and the annotation to this reading. It checks the whole path itself, so a route
+   * needs only this middleware and the order of middleware never matters.
+   */
+  const requireReply = createMiddleware<ReplyEnv>(async (c, next) => {
+    const annotation = annotationInPath(c);
+    // Only used on routes whose path includes :replyId.
+    const reply = findReply(db, c.req.param('replyId')!);
+    if (!reply || reply.annotationId !== annotation.id) {
+      throw new HTTPException(404, { message: 'Reply not found.' });
+    }
     c.set('annotation', annotation);
+    c.set('reply', reply);
     await next();
   });
 
@@ -87,6 +112,8 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
     return c.json({ replies: items, nextPageToken } satisfies ListRepliesResponse);
   });
 
+  routes.get('/:annotationId', requireAnnotation, (c) => c.json(c.get('annotation')));
+
   routes.get('/:annotationId/replies', requireAnnotation, (c) => {
     const { id } = c.get('annotation');
     const { items, nextPageToken } = paginate(c, (offset, limit) =>
@@ -102,8 +129,14 @@ export function annotationRoutes(db: DatabaseSync, events: ReadingEvents): Hono<
     if (result === KEY_REUSED) throw keyReused();
     const { resource: reply, isNew } = result;
     if (isNew) events.publish(reply.readingId, { name: EventName.ReplyCreated, data: reply });
+    c.header(
+      'Location',
+      `/v1/readings/${reply.readingId}/annotations/${reply.annotationId}/replies/${reply.id}`,
+    );
     return c.json(reply, 201);
   });
+
+  routes.get('/:annotationId/replies/:replyId', requireReply, (c) => c.json(c.get('reply')));
 
   return routes;
 }

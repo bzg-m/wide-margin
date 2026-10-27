@@ -115,8 +115,11 @@ export function listReadingReplies(
   return rows.map(toReply);
 }
 
-function findReply(db: DatabaseSync, id: number): Reply | undefined {
-  const row = db.prepare(`${SELECT_REPLIES} WHERE r.id = ?`).get(id);
+/** Finds a reply by API ID, or returns undefined if there is none. */
+export function findReply(db: DatabaseSync, id: string): Reply | undefined {
+  const rowId = parseId(id);
+  if (rowId === undefined) return undefined;
+  const row = db.prepare(`${SELECT_REPLIES} WHERE r.id = ?`).get(rowId);
   return row ? toReply(row as ReplyRow) : undefined;
 }
 
@@ -192,7 +195,7 @@ export function createReply(
       { id: number; annotation_id: number; text: string } | undefined;
     if (earlier) {
       const same = earlier.annotation_id === Number(annotationId) && earlier.text === input.text;
-      return same ? { resource: findReply(db, earlier.id)!, isNew: false } : KEY_REUSED;
+      return same ? { resource: findReply(db, String(earlier.id))!, isNew: false } : KEY_REUSED;
     }
   }
   const { id } = db
@@ -207,5 +210,5 @@ export function createReply(
       input.createdAt,
       input.idempotencyKey ?? null,
     ) as { id: number };
-  return { resource: findReply(db, id)!, isNew: true };
+  return { resource: findReply(db, String(id))!, isNew: true };
 }
