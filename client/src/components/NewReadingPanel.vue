@@ -33,9 +33,8 @@ const fieldErrors = ref<Record<string, string>>({});
 const formError = ref('');
 const sending = ref(false);
 // The draft keeps the last unsuccessful send; sending the same content again reuses its key.
-// TODO: if a send failed with an unknown outcome (the connection was lost) and the user edits
-// before sending again, the earlier version may also have been saved, leaving two readings.
-// Once readings can be edited, offer to apply the changes to the saved one instead.
+// Rare case: if a send was saved but its answer was lost, sending an edited version creates a
+// second reading. Editing readings would let the page update the saved one instead.
 const titleInput = useTemplateRef<HTMLInputElement>('title-input');
 const descriptionInput = useTemplateRef<HTMLTextAreaElement>('description-input');
 onMounted(() => titleInput.value?.focus());

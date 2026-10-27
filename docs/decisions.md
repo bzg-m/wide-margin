@@ -112,7 +112,7 @@ How it works end to end is in [realtime.md](realtime.md).
 
 ## Stack and tooling
 
-- **Node 26, pinned.** It is the newest even-numbered release, which becomes long-term support in October 2026. `.nvmrc`, `engines` and `engine-strict` make `npm install` stop with a clear message on any other version.
+- **Node 26, pinned.** It is the newest even-numbered release, which becomes long-term support in October 2026. `.nvmrc`, `engines` and `engine-strict` make `npm install` stop with a clear message on an older version.
 - **The server's TypeScript runs directly on Node,** with no build step; `tsc` only checks types. The `erasableSyntaxOnly` setting rules out syntax Node can't run, such as enums.
 - **One package with `client/`, `server/` and `shared/` folders.** There is one install. Shared code is imported by relative path, because Node doesn't strip types from packages inside `node_modules`.
 - **SQLite through Node's built-in `node:sqlite`.** There is nothing to install or compile. The module is at release-candidate stability; the driver is used in one file, so `better-sqlite3` is an easy fallback.
@@ -128,4 +128,5 @@ How it works end to end is in [realtime.md](realtime.md).
 ## Open
 
 - **Optional enhancements:** filter by student, search, a participation dashboard, editing and deleting.
-- **Edited retries after a lost connection:** if the first send was saved before the connection dropped, sending an edited version creates a second reading. Editing readings would let the app offer to apply the changes to the saved one instead.
+- **After an outage, the page waits for Retry,** which reloads it, rather than noticing by itself that the server is back. Drafts are kept in memory, so the reload clears them. In development, restarting `npm run dev` also reloads the page (Vite's development client does this), with the same effect. Recovering in place, without a reload, would fix both.
+- **Rare case:** if the connection drops after a new reading or post is saved but before the page hears back, sending an edited version creates a second one. Sending the same text again creates nothing new.
