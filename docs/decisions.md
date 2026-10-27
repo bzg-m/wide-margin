@@ -32,7 +32,7 @@ Design decisions for the app, grouped by topic, each with the reason behind it.
 
 ## Accessibility
 
-- **Moving to another page moves focus to its heading** and gives the browser tab the page's name, such as "Supervised vs. unsupervised learning · Collab read". In a single-page app nothing else tells a screen reader that the page changed. Opening the new-reading panel only changes the query, so it keeps focus in the form.
+- **Moving to another page moves focus to its heading** and gives the browser tab the page's name, such as "Supervised vs. unsupervised learning · Wide Margin". In a single-page app nothing else tells a screen reader that the page changed. Opening the new-reading panel only changes the query, so it keeps focus in the form.
 - **Focus never disappears with its control.** When the new-reading panel closes, by Cancel, Create or the back button, focus returns to "New reading". The "new annotations" button focuses the newest annotation as it goes. A form with errors focuses the first field that has one, so its error is read.
 - **Bylines carry hidden commas,** so screen readers and copied text get "Sarah Kim, You, 2 hours ago" rather than the parts run together.
 - **Reply toggles are named after the annotation's author** for screen readers, such as "Reply to Michael Reyes", starting with the visible text so voice control still finds them.

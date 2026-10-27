@@ -1,4 +1,7 @@
-# Collab read
+# Wide Margin
+
+Fermat noted in a book's margin that he had a proof the margin was too narrow to contain. This
+one is wider.
 
 A small collaborative reading app. Instructors post readings, and students and instructors
 discuss each one through annotations and replies, which appear for everyone viewing the reading
@@ -22,7 +25,7 @@ port 3000 (set `API_PORT` to change it).
 
 ## Sample data and signing in
 
-The first start creates `collab-read.db` with sample users, four readings and their discussions.
+The first start creates `wide-margin.db` with sample users, four readings and their discussions.
 To start over, stop the app, run `npm run db:reset`, and start it again.
 
 Signing in is simulated: pick anyone from the list. There are no passwords, and the sign-in cookie

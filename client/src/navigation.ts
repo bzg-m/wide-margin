@@ -9,9 +9,9 @@ export const RouteName = {
   NotFound: 'not-found',
 } as const;
 
-/** The browser tab's title for a page, such as "Readings · Collab read". */
+/** The browser tab's title for a page, such as "Readings · Wide Margin". */
 export function pageTitle(name?: string): string {
-  return name ? `${name} · Collab read` : 'Collab read';
+  return name ? `${name} · Wide Margin` : 'Wide Margin';
 }
 
 /**

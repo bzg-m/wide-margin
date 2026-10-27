@@ -75,7 +75,7 @@ async function switchUser() {
 <template>
   <header class="app-header">
     <div class="app-header-inner">
-      <RouterLink :to="{ name: RouteName.Readings }" class="app-name">Collab read</RouterLink>
+      <RouterLink :to="{ name: RouteName.Readings }" class="app-name">Wide Margin</RouterLink>
       <div v-if="session.user" class="current-user">
         <span class="identity">
           <span class="user-name" :title="session.user.displayName">

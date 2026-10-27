@@ -105,7 +105,7 @@ describe('database schema', () => {
 
 describe('openDatabase', () => {
   it('replaces an outdated posts view when an existing database is opened', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'collab-read-'));
+    const dir = mkdtempSync(join(tmpdir(), 'wide-margin-'));
     const path = join(dir, 'test.db');
     try {
       const old = openDatabase(path);
